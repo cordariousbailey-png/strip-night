@@ -16,12 +16,13 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Prepare web files
-        run: mkdir -p www && cp index.html www/
+        run: mkdir -p www resources && cp index.html www/ && cp icon.png splash.png resources/
       - name: Install and create Android project
         run: |
           npm install
           npx cap add android
           npx cap sync android
+          npx capacitor-assets generate --android --iconBackgroundColor "#0b0d28" --splashBackgroundColor "#0b0d28"
       - name: Apply fixes
         run: |
           set -e
