@@ -1828,13 +1828,18 @@ function turboFlutter(sh, mm, k) {
   s.start(t0, Math.random()); s.stop(t + 0.05);
 }
 /* one engine = the firing synth, exhaust and muffler filters, rpm layers (low, mid, high), intake and mechanical noise, a turbo model and a blower */
-function mkEngine(vol, pan, dull) {
+function mkEngine(vol, pan, dull, useWorklet = false) {
   const biq = (type, f, q, g) => { const b = AC.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; if (g != null) b.gain.value = g; return b; };
   const out = AC.createGain(), pn = AC.createStereoPanner ? AC.createStereoPanner() : null;
   out.gain.value = 0; if (pn) { pn.pan.value = pan; out.connect(pn); pn.connect(carBus); } else out.connect(carBus);
-  const syn = new EngSynth(AC.sampleRate, dull ? 99123 : 12345);
-  const sp = AC.createScriptProcessor(1024, 0, 3), split = AC.createChannelSplitter(3);
-  sp.onaudioprocess = e => { syn.process(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.getChannelData(2)); };
+  const syn = useWorklet ? null : new EngSynth(AC.sampleRate, dull ? 99123 : 12345);
+  const sp = useWorklet
+    ? new AudioWorkletNode(AC, 'strip-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [3], processorOptions: { seed: dull ? 99123 : 12345 } })
+    : AC.createScriptProcessor(4096, 0, 3);
+  const split = AC.createChannelSplitter(3);
+  if (!useWorklet) sp.onaudioprocess = e => { syn.process(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.getChannelData(2)); };
+  const P = useWorklet ? { rpm:900, load:0.1, amp:0, cut:1, nos:0, lope:.3, crack:.5, pipe:150, g:.6, scKind:0, scAmp:0, scRatio:6, on:0, skew:1.035, dmg:0 } : syn.p;
+  const send = (type, data) => { if (useWorklet) sp.port.postMessage({ type, ...data }); };
   const mq1 = biq('peaking', 380, 0.9, 4), mq2 = biq('peaking', 760, 0.9, 3), f1 = biq('peaking', 240, 1.3, 3), f2 = biq('peaking', 640, 1.6, 4), f3 = biq('peaking', 1500, 1.1, 3);
   const hp = biq('highpass', 68, 0.8), air = biq('highshelf', 5500, 0.7, 4), body = biq('peaking', 95, 1.1, 3), drone = biq('peaking', 120, 1.6, 3), muff = biq('lowpass', 3200, 0.8), sh = AC.createWaveShaper(), eg = AC.createGain();
   sp.connect(split); split.connect(hp, 0); hp.connect(body); body.connect(drone); drone.connect(mq1); mq1.connect(mq2); mq2.connect(f1); f1.connect(f2); f2.connect(f3); f3.connect(muff); muff.connect(air); air.connect(sh); sh.connect(eg); eg.connect(out);
@@ -1853,12 +1858,12 @@ function mkEngine(vol, pan, dull) {
   const whoosh = noiseBand('bandpass', 1400, 0.9), surge = noiseBand('bandpass', 700, 1.6);
   let curId = '', lastT = AC.currentTime, vts = 0, shaft = 0, prevThr = 0, atBoost = false, alT = 0, lastRpm = 0;
   return {
-    pop(a) { if (a == null) a = 0.5; syn.pop(a); },
+    pop(a) { if (a == null) a = 0.5; if (useWorklet) send('pop', {amount:a}); else syn.pop(a); },
     get shaft() { return shaft; }, get vtec() { return vts; },
     set(rpm, load, on, id, c) {
       const t = AC.currentTime, dt = Math.max(0.004, Math.min(0.1, t - lastT)); lastT = t;
-      const P = syn.p, vp = voiceParams(id, c.snd, { turbo: c.turbo }), v = vp.v, red = c.red || 7500, r = rpm / red, dmg = c.dmg || 0;
-      if (curId !== vp.id) { curId = vp.id; syn.setVoice(vp.id); sh.curve = curve(v.drive); }
+      const vp = voiceParams(id, c.snd, { turbo: c.turbo }), v = vp.v, red = c.red || 7500, r = rpm / red, dmg = c.dmg || 0;
+      if (curId !== vp.id) { curId = vp.id; (useWorklet ? send('voice', {id:vp.id}) : syn.setVoice(vp.id)); sh.curve = curve(v.drive); }
       const thr = c.thr == null ? load : c.thr;
       /* cam-switch: the cam profile switches at a real rpm with enough throttle, and the intake, exhaust and induction tone cross over smoothly */
       const vtT = v.vt && on && c.vtOk !== false ? sst(v.vt - 120, v.vt + 330, rpm) * sst(0.25, 0.55, load) : 0;
@@ -1911,7 +1916,7 @@ function mkEngine(vol, pan, dull) {
         turboLift(shaft, mm, mode, save.mute ? 0 : 1);
         if (c.al && rpm > 3200) alT = t + 1.1;
       }
-      if (alT > t && on) { if (Math.random() < dt * 16) syn.pop(0.3 + 0.45 * Math.random()); }
+      if (alT > t && on) { if (Math.random() < dt * 16) (useWorklet ? send('pop', {amount:0.3 + 0.45 * Math.random()}) : syn.pop(0.3 + 0.45 * Math.random())); }
       /* wastegate: crossing the boost target and then holding it on an external gate gives a short exhaust chirp */
       if (turbo && on && c.bst) {
         const hit = spoolT > 0.98 && thr > 0.7;
@@ -1921,7 +1926,7 @@ function mkEngine(vol, pan, dull) {
       } else atBoost = false;
       /* blowers: tone and pitch follow engine speed, the pulley ratio and boost */
       const pul = c.pulley || 1, sk = sk0 || ((v.whine || c.fx === 'whine') && !turbo ? 1 : 0);
-      if (sk) syn.setSc(sk);
+      if (sk) { if (useWorklet) send('sc', {kind:sk}); else syn.setSc(sk); }
       P.scKind = sk; P.scRatio = (({ 1: 9, 2: 8, 3: 21, 4: 8 })[sk] || 9) * pul; /* a lower, thicker whine (about 130 Hz at idle to 900 Hz at redline) instead of a high whistle */
       const sBoost = c.bst ? Math.max(0.2, c.psi ? clamp01(c.psi / Math.max(1, c.pk || 1)) : spoolT) : (c.boost == null ? 0.8 : Math.max(0.2, c.boost));
       P.scAmp = sk && on ? 1.1 * sBoost * (0.55 + 0.45 * load) * (1 + 0.25 * (pul - 1)) : 0;
@@ -1931,6 +1936,7 @@ function mkEngine(vol, pan, dull) {
       belt.g.gain.setTargetAtTime(sk && on && pul > 1.12 && sBoost > 0.5 ? vol * 0.01 * (pul - 1.1) * 8 * sBoost : 0, t, 0.1); belt.b.frequency.setTargetAtTime(2200 + rpm * 0.1, t, 0.1);
       if (sk && on && pul >= 1.2 && thr - prevThr > 0.5 && rpm > 2500 && sBoost > 0.4 && !save.mute) noiseHit(0.2, 'bandpass', 2400, 1900, 0.05 + 0.04 * (pul - 1.2), 5);
       prevThr = thr; lastRpm = rpm;
+      if (useWorklet) send('params', {params:P});
     }
   };
 }
@@ -1951,7 +1957,19 @@ function audioStart() {
         [[0.034, 0.5], [0.081, 0.38], [0.139, 0.3]].forEach(([tt, a]) => { const k = Math.floor((tt + ch * 0.006) * sr); for (let j = 0; j < 40; j++) d[k + j] += a * (Math.random() * 2 - 1) * Math.exp(-j / 9); }); } }
     noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    engP = AC.createScriptProcessor ? mkEngine(0.5, -0.1, false) : null; engO = AC.createScriptProcessor ? mkEngine(0.26, 0.55, true) : null;
+    // Fallback uses a larger buffer to reduce underruns on older Android WebViews.
+    const initEngines = useWorklet => {
+      engP = mkEngine(0.5, -0.1, false, useWorklet);
+      engO = mkEngine(0.26, 0.55, true, useWorklet);
+    };
+    if (AC.audioWorklet && window.AudioWorkletNode) {
+      AC.audioWorklet.addModule('./engine-worklet.js').then(() => {
+        if (AC) initEngines(true);
+      }).catch(err => {
+        console.warn('AudioWorklet unavailable; using buffered fallback', err);
+        if (AC && AC.createScriptProcessor) initEngines(false);
+      });
+    } else if (AC.createScriptProcessor) initEngines(false);
     const mkLoop = (type, f, q) => { const s = noiseSrc(), fl = AC.createBiquadFilter(), g = AC.createGain(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; g.gain.value = 0; s.connect(fl); fl.connect(g); g.connect(carBus); return { g, fl }; };
     windN = mkLoop('lowpass', 700, 0.5); hissN = mkLoop('highpass', 3500, 0.7); squealN = mkLoop('bandpass', 2100, 6);
     applyVol();
