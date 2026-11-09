@@ -1,0 +1,26 @@
+{
+  "name": "strip-night",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Strip Night: a quarter-mile drag racing game",
+  "scripts": {
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --iconBackgroundColor \"#0b0d28\" --splashBackgroundColor \"#0b0d28\"",
+    "android": "cap sync android && cap open android",
+    "ios": "cap sync ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
+    "@capacitor/screen-orientation": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
+    "@capacitor-community/admob": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "cordova-plugin-purchase": "^13.10.0"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.1.0"
+  }
+}

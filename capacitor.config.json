@@ -1,0 +1,19 @@
+{
+  "appId": "com.example.stripnight",
+  "appName": "Strip Night",
+  "webDir": "www",
+  "backgroundColor": "#0b0d28",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#0b0d28",
+      "showSpinner": false
+    }
+  }
+}
