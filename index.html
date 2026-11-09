@@ -3545,7 +3545,7 @@ document.addEventListener('click', e => { const b = e.target.closest && e.target
 const cv = $('cv'), mainCtx = cv.getContext('2d'), stageEl = $('stage');
 let ctx = mainCtx;
 let W = 400, H = 400, DPR = 1, padL = 16, padR = 16, ppm = 28, camX = 0, QCAP = 2;
-const PERF = { lvl: 0, ema: 16, t: 0 }; /* automatic quality: slow phones drop the canvas resolution and the music gets lighter */
+const PERF = { lvl: 0, ema: 16, t: 0 }; /* adaptive audio load only: preserve canvas resolution throughout races */
 const F_DISP = '"Big Shoulders Display","Arial Narrow",Impact,sans-serif';
 const F_MONO = '"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace';
 
@@ -4421,7 +4421,7 @@ function musicTick() {
 function perfWatch(ms) {
   if (document.hidden || !(ms > 0) || ms > 250) return;
   PERF.ema += 0.06 * (ms - PERF.ema);
-  if (PERF.ema > 27) { PERF.t += ms; if (PERF.t > 2500 && PERF.lvl < 2) { PERF.lvl++; PERF.t = 0; PERF.ema = 16; QCAP = PERF.lvl === 1 ? 1.25 : 1; try { resize(); } catch (e) {} } }
+  if (PERF.ema > 27) { PERF.t += ms; if (PERF.t > 2500 && PERF.lvl < 2) { PERF.lvl++; PERF.t = 0; PERF.ema = 16; /* Preserve full-resolution race canvas; only lighten procedural music. */ } }
   else PERF.t = Math.max(0, PERF.t - ms);
 }
 let last = 0, acc = 0;
