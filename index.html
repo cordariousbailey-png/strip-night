@@ -469,6 +469,24 @@ body { background: var(--night); }
 .lab .meter { font: 500 13px var(--f-mono); color: var(--muted); margin: 6px 0; }
 .lab details { margin-top: 10px; } .lab summary { cursor: pointer; font: 700 13px var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--sodium); }
 .lab pre { white-space: pre-wrap; font: 500 12px/1.5 var(--f-mono); color: var(--muted); }
+#title { position: absolute; inset: 0; z-index: 90; background: #04050f !important; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; transition: opacity .5s; }
+#title[hidden] { display: none; }
+#title.out { opacity: 0; pointer-events: none; }
+#tCv { position: absolute; inset: 0; width: 100%; height: 100%; }
+#title .tbox { position: relative; z-index: 2; width: 100%; max-width: 420px; padding: 11vh 24px 24px; text-align: center; }
+#title .tlogo { font: 900 clamp(54px, 17vw, 84px)/0.9 'Arial Black', var(--f-disp, 'Big Shoulders Display'), Impact, sans-serif; font-style: italic; letter-spacing: .02em; text-transform: uppercase; opacity: 0; transform: translateY(14px) scale(.96); animation: tIn .9s .15s ease-out forwards; }
+#title .tlogo b { display: block; font-weight: 900; background: linear-gradient(180deg, #fff 0%, #9be9ff 45%, #35d6ff 50%, #ff4fa3 52%, #ffd24a 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 12px rgba(53,214,255,.7)) drop-shadow(0 4px 0 #5a0f6e); }
+#title .tlogo span { display: block; background: linear-gradient(180deg, #fff7a8 0%, #ffd24a 45%, #ff8f1f 50%, #ff2f7d 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 12px rgba(255,79,163,.75)) drop-shadow(0 4px 0 #5a0f6e); }
+#title::after { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 2px, transparent 2px 4px); }
+#title .tsub { margin-top: 14px; font: 700 12px var(--f-mono, monospace); letter-spacing: .28em; text-transform: uppercase; color: #35d6ff; text-shadow: 0 0 10px rgba(53,214,255,.8); opacity: 0; animation: tIn .8s .7s ease-out forwards; }
+#title .tcar { margin: 22px auto 0; width: 240px; max-width: 70%; height: auto; display: block; opacity: 0; animation: tIn .8s 1.0s ease-out forwards; filter: drop-shadow(0 0 14px rgba(255,79,163,.5)); }
+#title .tmenu { margin: 70px 12px 0; display: flex; flex-direction: column; gap: 12px; align-items: stretch; opacity: 0; pointer-events: none; transform: translateY(10px); transition: opacity .6s, transform .6s; }
+#title.ready .tmenu { opacity: 1; pointer-events: auto; transform: none; }
+#title .tmenu button { padding: 15px 18px; border-radius: 12px; border: 2px solid #35d6ff; background: rgba(20,6,50,.78); color: #bff4ff; text-shadow: 0 0 8px rgba(53,214,255,.8); box-shadow: 0 0 14px rgba(53,214,255,.35), inset 0 0 12px rgba(53,214,255,.15); font: 800 16px var(--f-mono, monospace); letter-spacing: .12em; text-transform: uppercase; }
+#title .tmenu button.main { border-color: #ff4fa3; background: linear-gradient(180deg, #ff6fb5, #c2186b); color: #fff; text-shadow: 0 0 10px #fff; font-size: 20px; padding: 18px; box-shadow: 0 5px 0 #6a0a3e, 0 0 28px rgba(255,79,163,.6); }
+#title .tmenu button:active { transform: translateY(2px); }
+#title .tver { position: absolute; z-index: 2; bottom: 14px; left: 0; right: 0; text-align: center; font: 500 11px var(--f-mono, monospace); color: #b06ad8; letter-spacing: .14em; opacity: 0; animation: tIn .8s 1.4s ease-out forwards; }
+@keyframes tIn { to { opacity: 1; transform: none; } }
 </style>
 
 <div id="app">
@@ -479,6 +497,20 @@ body { background: var(--night); }
     <button class="chip" id="btnGarage" type="button">Garage</button>
   </div></header>
 
+  <div id="title" role="dialog" aria-label="Main menu">
+    <canvas id="tCv"></canvas>
+    <div class="tbox">
+      <div class="tlogo"><b>Strip</b><span>Night</span></div>
+      <div class="tsub">A quarter-mile grudge</div>
+      <canvas id="tCar" class="tcar" hidden></canvas>
+      <div class="tmenu">
+        <button type="button" class="main" id="tPlay">Play</button>
+        <button type="button" id="tMusic">Music: on</button>
+        <button type="button" id="tBackup" hidden>Backup and restore</button>
+      </div>
+    </div>
+    <div class="tver">MIDNIGHT GRUDGE</div>
+  </div>
   <div class="overlay" id="monetOv" hidden style="z-index:70"><div class="sheet" id="monetBox"></div></div>
 
   <main id="stage">
@@ -1404,9 +1436,9 @@ let PD = null, MU = null;
 if (!save.iap || typeof save.iap !== 'object' || Array.isArray(save.iap)) { save.iap = { noads: 0, full: Object.keys(save.wins || {}).some(k => +k >= 5) ? 1 : 0, looks: 0 }; }
 if (typeof save.adRaces !== 'number') save.adRaces = 0;
 if (typeof save.adT !== 'number') save.adT = 0;
-const iapOn = k => !!(save.iap && save.iap[k]);
+const iapOn = k => k === 'looks' || k === 'full' || !!(save.iap && save.iap[k]); /* neon pack and full game are free */
 const FREE_RIVALS = 5;
-const gated = i => i >= FREE_RIVALS && !iapOn('full');
+const gated = i => false; /* the full game is free: every chapter is open */
 const unlocked = i => i >= NREAL || !gated(i) && (i === 0 || !!save.wins[i - 1] || Object.keys(save.wins).some(k => +k >= i) || !!(PD && PD.et <= RIVALS[i - 1].est - 0.3));
 if (save.rival >= NREAL) save.rival = Math.min(NREAL - 1, save.rivalBack | 0);
 if (!unlocked(save.rival)) save.rival = 0;
@@ -2108,6 +2140,9 @@ const MCFG = {
   products: {
     noads: { id: 'stripnight.noads', price: '$2.99', name: 'Remove ads', note: 'No more pop-up ads between races. Optional bonus-cash ads stay available.' },
     full: { id: 'stripnight.full', price: '$4.99', name: 'Full game', note: 'Unlocks chapters two to four: The Builders, The Council, The Enforcers and Overlord.' },
+    starter: { id: 'stripnight.starter', price: '$2.99', name: 'Starter bundle', note: 'Best value: $25,000 cash, no pop-up ads and the Premium paint pack. One time only.' },
+    paint: { id: 'stripnight.paint', price: '$1.99', name: 'Premium paint pack', note: 'Unlocks the Pearl, Galaxy and Camo finishes for every car. Glitter is free.' },
+    dealer: { id: 'stripnight.dealer', price: '$2.99', name: "Dealer's key", note: 'Every car in the dealership is open from the start. You still pay for each car with in-game cash.' },
     looks: { id: 'stripnight.neon', price: '$0.99', name: 'Neon underglow pack', note: 'Eight extra underglow colors for every car.' },
     cash1: { id: 'stripnight.cash1', price: '$0.99', name: 'Pocket of cash', note: 'Adds $5,000 to your wallet.', cash: 5000, consumable: true },
     cash2: { id: 'stripnight.cash2', price: '$2.99', name: 'Stack of cash', note: 'Adds $20,000 to your wallet.', cash: 20000, consumable: true },
@@ -2135,6 +2170,7 @@ const MONET = {
   grant(k) {
     const p = MCFG.products[k]; if (!p) return;
     if (p.cash) save.cash += p.cash; else save.iap[k] = 1;
+    if (k === 'starter') { save.cash += 25000; save.iap.noads = 1; save.iap.paint = 1; }
     persist(); try { $('cash').textContent = money(save.cash); renderGarage(); } catch (e) {}
   },
   panel(html, onReady) { const o = $('monetOv'), b = $('monetBox'); b.innerHTML = html; o.hidden = false; if (onReady) onReady(b); return () => { o.hidden = true; b.innerHTML = ''; }; },
@@ -2188,7 +2224,7 @@ function renderStore() {
     const ok = await MONET.rewarded(); if (ok) { save.cash += adBonus(); save.adT = Date.now(); persist(); sfxCoin(); renderGarage(); } else renderStore();
   }, wait > 0);
   B.appendChild(mk('div', 'sh', 'Unlocks'));
-  ['full', 'noads', 'looks'].forEach(k => { const p = MCFG.products[k]; card(p.name, p.note, iapOn(k) ? 'Owned' : MONET.price(k), () => MONET.buy(k).then(renderStore), iapOn(k)); });
+  ['starter', 'paint', 'dealer', 'noads'].filter(k => k !== 'starter' || !iapOn('starter')).forEach(k => { const p = MCFG.products[k]; card(p.name, p.note, iapOn(k) ? 'Owned' : MONET.price(k), () => MONET.buy(k).then(renderStore), iapOn(k)); });
   B.appendChild(mk('div', 'sh', 'Cash'));
   ['cash1', 'cash2', 'cash3'].forEach(k => { const p = MCFG.products[k]; card(p.name, p.note, MONET.price(k), () => MONET.buy(k).then(renderStore)); });
   if (MONET.native) { const b = mk('button', 'cta alt', 'Restore purchases'); b.type = 'button'; b.onclick = () => MONET.restore(); B.appendChild(b); }
@@ -2200,6 +2236,7 @@ function renderAdRow(o) {
   const add = (label, fn) => { const b = mk('button', null, label); b.type = 'button'; b.onclick = async () => { b.disabled = true; const ok = await MONET.rewarded(); if (ok) fn(b); else b.disabled = false; }; R.appendChild(b); };
   if (o.gate) { const b = mk('button', null, 'Unlock the full game (' + MONET.price('full') + ')'); b.type = 'button'; b.onclick = () => { $('slipSheet').hidden = true; showGarage(); gTab = 'store'; applyGTab(); renderGarage(); }; R.appendChild(b); }
   if (o.prize > 0) add('Watch an ad: double the prize (+' + money(o.prize) + ')', b => { save.cash += o.prize; persist(); $('cash').textContent = money(save.cash); b.textContent = 'Prize doubled'; b.disabled = true; sfxCoin(); });
+  if (!o.dead && (save.wear[o.eng] || 0) > 0.3) add('Watch an ad: free engine service (' + Math.round(save.wear[o.eng] * 100) + '% wear)', b => { delete save.wear[o.eng]; persist(); b.textContent = 'Engine serviced'; b.disabled = true; sfxCoin(); });
   if (o.dead) add('Watch an ad: free engine rebuild', b => { delete save.dmg[o.eng]; delete save.wear[o.eng]; persist(); b.textContent = 'Engine rebuilt'; b.disabled = true; sfxCoin(); });
 }
 function maybeInterstitial() {
@@ -2664,7 +2701,7 @@ function renderCars() {
   { const gc = document.createElement('div'); gc.className = 'us'; gc.style.cssText = 'margin:0 0 8px;font-weight:700'; gc.textContent = 'Garage ' + save.ownedCars.length + ' of ' + GARAGE_MAX + ' cars' + (garageFull() ? ' \u00b7 full: sell one to buy another' : ''); box.appendChild(gc); }
   const beaten = Object.keys(save.wins).filter(k => save.wins[k]).length;
   CARS.forEach(c => {
-    const owned = save.ownedCars.includes(c.id), on = save.car === c.id, open = beaten >= c.req;
+    const owned = save.ownedCars.includes(c.id), on = save.car === c.id, open = beaten >= c.req || iapOn('dealer');
     const build = on ? pickBuild() : (save.cars[c.id] || freshBuild(c));
     const row = document.createElement('div'); row.className = 'up' + (on ? ' sel' : '') + (!owned && !open ? ' locked' : '');
     const left = document.createElement('div');
@@ -2853,8 +2890,8 @@ function renderLooks() {
       if (!save.gloss) save.gloss = {};
       const fr = document.createElement('div'); fr.className = 'setrow'; const fl = document.createElement('span'); fl.textContent = 'Finish'; fr.appendChild(fl);
       const sg = document.createElement('div'); sg.className = 'seg fin'; fr.style.flexWrap = 'wrap';
-      [['Matte', 0], ['Gloss', 1], ['Glitter', 2], ['Pearl', 3], ['Galaxy', 4], ['Camo', 5]].forEach(p => { const b = document.createElement('button'); b.type = 'button'; b.textContent = p[0]; b.setAttribute('aria-pressed', (save.gloss[save.car] || 0) === p[1] ? 'true' : 'false');
-        b.onclick = () => { if (p[1]) save.gloss[save.car] = p[1]; else delete save.gloss[save.car]; persist(); renderLooks(); drawPreview(); renderCars(); }; sg.appendChild(b); });
+      [['Matte', 0], ['Gloss', 1], ['Glitter', 2], ['Pearl', 3], ['Galaxy', 4], ['Camo', 5]].forEach(p => { const lk = p[1] >= 3 && !iapOn('paint'); const b = document.createElement('button'); b.type = 'button'; b.textContent = p[0] + (lk ? ' \u{1F512}' : ''); b.setAttribute('aria-pressed', (save.gloss[save.car] || 0) === p[1] ? 'true' : 'false');
+        b.onclick = () => { if (lk) { gTab = 'store'; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0); return; } if (p[1]) save.gloss[save.car] = p[1]; else delete save.gloss[save.car]; persist(); renderLooks(); drawPreview(); renderCars(); }; sg.appendChild(b); });
       fr.appendChild(sg); box.appendChild(fr);
     }
     if (PHOTOS[curCar().trim.img] && PHOTOS[curCar().trim.img].gw) {
@@ -4570,7 +4607,7 @@ const STORY = {
   gate: [N(`END OF CHAPTER ONE`), N(`The Locals are beaten. The strip has noticed you.`),
     M(`Kimi was right. The Ghost will want to meet you, and he does not come alone. The Builders run the next stretch of this strip.`),
     M(`Their cars are not like anything you have raced. Neither is the man who sends them.`),
-    N(`CHAPTER TWO: THE BUILDERS. Unlock the full game to keep going.`)],
+    N(`CHAPTER TWO: THE BUILDERS.`)],
   end: [N(`Dawn over the strip. The sodium lights flicker off, one at a time.`), M(`Ten years. I never thought I would see the shop again.`),
     M(`You did that. Not me. You took the strip back, one run at a time.`),
     N(`The gate to Mack's Speed Shop is open. Inside, somebody has already swept the floor.`),
@@ -4820,6 +4857,40 @@ function startRace() {
   if (ST) return;
   preScene(save.rival, startRaceNow);
 }
+function titleInit(go) {
+  const T = $('title'), cv = $('tCv'), c = cv.getContext('2d'); let raf = 0, t0 = performance.now(), done = false;
+  const stars = Array.from({ length: 70 }, () => [Math.random(), Math.random() * 0.55, Math.random() * 6.28, 0.5 + Math.random()]);
+  function size() { const r = T.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1); cv.width = Math.max(1, Math.round(r.width * d)); cv.height = Math.max(1, Math.round(r.height * d)); c.setTransform(d, 0, 0, d, 0, 0); }
+  function draw(now) {
+    if (done) return; const t = (now - t0) / 1000, r = T.getBoundingClientRect(), w = r.width, h = r.height;
+    const hz = h * 0.52, g = c.createLinearGradient(0, 0, 0, hz); g.addColorStop(0, '#0a0220'); g.addColorStop(0.55, '#2a0a5e'); g.addColorStop(0.85, '#7a1470'); g.addColorStop(1, '#ff4f8b');
+    c.fillStyle = g; c.fillRect(0, 0, w, hz);
+    stars.forEach(s => { c.globalAlpha = 0.3 + 0.6 * Math.abs(Math.sin(t * s[3] + s[2])); c.fillStyle = '#fff'; c.fillRect(s[0] * w, s[1] * hz, 1.6, 1.6); }); c.globalAlpha = 1;
+    const sr = Math.min(w, h) * 0.22, sx = w / 2, sy = hz - sr * 0.12;
+    c.save(); c.beginPath(); c.rect(0, 0, w, hz); c.clip();
+    const sg = c.createLinearGradient(0, sy - sr, 0, sy + sr); sg.addColorStop(0, '#fff36a'); sg.addColorStop(0.45, '#ffb13d'); sg.addColorStop(1, '#ff3f8e');
+    c.shadowColor = 'rgba(255,79,163,.7)'; c.shadowBlur = 50; c.fillStyle = sg; c.beginPath(); c.arc(sx, sy, sr, 0, 6.2832); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = '#4a0f6e'; for (let i = 0; i < 6; i++) { const y = sy - sr * 0.05 + i * sr * 0.17 + ((t * 10) % (sr * 0.17)) * 0; c.fillRect(sx - sr, y, sr * 2, sr * (0.02 + i * 0.012)); }
+    c.restore();
+    const gg = c.createLinearGradient(0, hz, 0, h); gg.addColorStop(0, '#1a0535'); gg.addColorStop(1, '#07010f'); c.fillStyle = gg; c.fillRect(0, hz, w, h - hz);
+    const gh = h - hz; c.lineWidth = 1.5; c.shadowColor = '#35d6ff'; c.shadowBlur = 8; c.strokeStyle = 'rgba(53,214,255,.85)';
+    for (let i = 0; i < 9; i++) { const f = ((i + (t * 0.55) % 1) / 9), y = hz + gh * f * f; c.globalAlpha = 0.35 + f * 0.6; c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
+    c.globalAlpha = 1; c.shadowColor = '#ff4fa3'; c.strokeStyle = 'rgba(255,79,163,.8)';
+    for (let i = -9; i <= 9; i++) { c.beginPath(); c.moveTo(w / 2 + i * w * 0.012, hz); c.lineTo(w / 2 + i * w * 0.2, h); c.stroke(); }
+    c.shadowBlur = 24; c.shadowColor = '#ff4fa3'; c.fillStyle = '#fff'; c.fillRect(0, hz - 1, w, 2); c.shadowBlur = 0;
+    raf = requestAnimationFrame(draw);
+  }
+  size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
+  try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; drawCarThumb(cc, car, save.cars[car.id] || pickBuild()); } } catch (e) {}
+  const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
+  if (!needStarter) $('tBackup').hidden = false;
+  const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
+  mus.onclick = () => { save.music = save.music === false; persist(); msync(); if (save.music !== false) audioStart(); const a = $('muOn'), b = $('muOff'); if (a && b) { a.setAttribute('aria-pressed', save.music !== false ? 'true' : 'false'); b.setAttribute('aria-pressed', save.music === false ? 'true' : 'false'); } }; msync();
+  function leave(after) { if (done) return; done = true; cancelAnimationFrame(raf); window.removeEventListener('resize', size); T.classList.add('out'); setTimeout(() => { T.hidden = true; if (after) after(); }, 480); }
+  play.onclick = () => { audioStart(); leave(go); };
+  $('tBackup').onclick = () => { audioStart(); leave(() => { try { gTab = 'race'; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0); const b = $('backupSec'); if (b) b.scrollIntoView(); } catch (e) {} }); };
+  setTimeout(() => T.classList.add('ready'), 1500);
+}
 function introScene() { if (!save.seen.intro && !needStarter) playScene('intro', buildScene(STORY.intro, null), null); }
 (() => {
   const s = stEl('story');
@@ -4840,7 +4911,7 @@ document.addEventListener('pointerdown', () => audioStart(), { passive: true });
 newRace();
 resize();
 renderGarage();
-if (needStarter) showStarter(); else setTimeout(introScene, 500);
+titleInit(() => { if (needStarter) showStarter(); else setTimeout(introScene, 500); });
 try { if (document.fonts && document.fonts.load) { document.fonts.load('900 40px "Big Shoulders Display"'); document.fonts.load('600 14px "IBM Plex Mono"'); } } catch (e) {}
 requestAnimationFrame(frame);
 })();
