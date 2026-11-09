@@ -1646,6 +1646,9 @@ const AU = { gear: 1, nos: 0, fin: false, t: 0, stage: 0, purged: false, ph: '',
    and each bank rings like a pipe. Cam lope, exhaust and header choices change those pulses, so no part is a plain tone. */
 const BK = { chev: [0, 1, 1, 0, 1, 0, 0, 1], ls: [0, 1, 0, 1, 1, 0, 1, 0], ford: [0, 0, 1, 0, 1, 1, 0, 1], v6: [0, 1, 0, 1, 0, 1], rot: [0, 1, 0, 1], i4: [0, 0, 0, 0], i6: [0, 0, 0, 0, 0, 0], bx: [0, 0, 1, 1] };
 const VOICE = {
+  na4:    { bk: BK.i4, body: 124, bd: 7, crack: 1.65, cd: 2.4, pipe: 350, cut: 5350, drive: 2.45, amp: .80, lope: .04, intake: .56, mech: .5, hpf: 145 },
+  turbo4: { bk: BK.i4, body: 112, bd: 8, crack: 1.35, cd: 2.9, pipe: 310, cut: 4400, drive: 2.8, amp: .88, lope: .10, intake: .34, mech: .5, whistle: 1, tw: 1, hpf: 140 },
+  camv8:  { bk: BK.chev, body: 73, bd: 14, crack: .68, cd: 3.4, pipe: 135, cut: 4250, drive: 2.5, amp: 1.08, lope: .60, intake: .28, hpf: 75 },
   v8:     { bk: BK.chev, body: 82,  bd: 11, crack: .55, cd: 3.2, pipe: 148, cut: 3536, drive: 2.0, amp: 1.0,  lope: .32, intake: .22, hpf: 85 },
   bb:     { bk: BK.chev, body: 62,  bd: 15, crack: .45, cd: 3.6, pipe: 118, cut: 3042, drive: 2.4, amp: 1.2,  lope: .48, intake: .30, hpf: 72 },
   ls:     { bk: BK.ls,   body: 100, bd: 9,  crack: .75, cd: 2.4, pipe: 190, cut: 4805, drive: 1.8, amp: .95,  lope: .10, intake: .34, hpf: 85 },
@@ -1675,6 +1678,16 @@ const VOICE = {
   g64:    { bk: BK.i4,   body: 108, bd: 8,  crack: 2.03, cd: 3.3, pipe: 278, cut: 4370, drive: 2.7, amp: .82, lope: .20, intake: .36, mech: .5 },
   rotary: { bk: BK.rot,  body: 150, bd: 5,  crack: 1.0, cd: 1.8, pipe: 290, cut: 6500, drive: 3.0, amp: .9,   lope: .55, intake: .10 }
 };
+/* Audio-only profile selection. Never changes vehicle specs, power, or saved engine IDs. */
+function engineAudioVoice(id, snd, turbo, bst) {
+  const v = VOICE[id] || VOICE.v8;
+  const forcedTurbo = !!(turbo || (bst && bst.type === 'turbo'));
+  const blown = !!(bst && bst.type === 'sc');
+  if (forcedTurbo && (id === 'v8' || id === 'ls' || id === 'ford' || id === 'camv8')) return 'ttv8';
+  if (forcedTurbo && (id === 'na4' || id === 'g64' || id === 'b16' || id === 'b18' || id === 'k20' || id === 'k24')) return 'turbo4';
+  if (!forcedTurbo && !blown && id === 'v8' && snd && (snd.cam | 0) >= 3) return 'camv8';
+  return VOICE[id] ? id : 'v8';
+}
 /* turn a voice plus the installed parts into sound settings */
 function voiceParams(id, snd, over) {
   const v = VOICE[id] || VOICE.v8, s = snd || {}, o = over || {};
@@ -2050,7 +2063,7 @@ function audioTick() {
   if (!AC || !engP || !engO || AU.lab) return;
   if (DYNO.on && DYNO.sp && !save.mute) {
     const e = DYNO.sp.eng, b = e.bst;
-    engP.set(DYNO.rpm, DYNO.load, true, e.voice || e.id, { boost: DYNO.bo, psi: DYNO.psi || 0, pk: b ? b.pk : 0, bst: b, cut: DYNO.rpm > e.red * 0.985 && Math.floor(performance.now() / 65) % 2 ? 0.25 : 1, fx: e.fx, snd: e.snd, nos: 0, turbo: e.turbo, red: e.red, dmg: 0, al: false, wgExt: !!(b && b.cfg !== 'sc') });
+    engP.set(DYNO.rpm, DYNO.load, true, engineAudioVoice(e.voice || e.id, e.snd, e.turbo, e.bst), { boost: DYNO.bo, psi: DYNO.psi || 0, pk: b ? b.pk : 0, bst: b, cut: DYNO.rpm > e.red * 0.985 && Math.floor(performance.now() / 65) % 2 ? 0.25 : 1, fx: e.fx, snd: e.snd, nos: 0, turbo: e.turbo, red: e.red, dmg: 0, al: false, wgExt: !!(b && b.cfg !== 'sc') });
     engO.set(0, 0, false, 'v8', {}); return;
   }
   const t = AC.currentTime, live = phase !== 'garage' && phase !== 'done' && !document.hidden;
@@ -2059,7 +2072,7 @@ function audioTick() {
   const red = player.eng.red || 7500;
   const lim = live && load > 0.5 && player.rpm > red * 0.975 && !player.finished && player.mode === 'stage';
   const cut = lim && Math.floor(performance.now() / 65) % 2 ? 0.25 : 1;
-  const pe = player.eng, pn = player.nos > 0, vpP = () => voiceParams(pe.voice || pe.id, pe.snd, { turbo: pe.turbo });
+  const pe = player.eng, pn = player.nos > 0, vpP = () => voiceParams(engineAudioVoice(pe.voice || pe.id, pe.snd, pe.turbo, pe.bst), pe.snd, { turbo: pe.turbo });
   /* nitrous: stages come from the kit level and open one after another; the solenoid clicks as each one opens */
   const nStages = [1, 1, 2, 3][save.nos | 0] || 1, nEl = pn ? Math.max(0, (player.nosDur || 3) - player.nos) : 0;
   let nAct = 0; if (pn) for (let k = 0; k < nStages; k++) nAct += clamp01((nEl - 0.45 * k) / 0.25);
@@ -2069,11 +2082,11 @@ function audioTick() {
   const cutP = lcOn && Math.floor(performance.now() / 55) % 2 ? 0.3 : cut;
   if (lcOn && Math.random() < dt * 9 * Math.min(1, 0.4 + vpP().popP)) engP.pop(0.35 + 0.4 * Math.random());
   const ctxP = { boost: player.boost, psi: player.psi || 0, pk: pe.bst ? pe.bst.pk : 0, bst: pe.bst, cut: cutP, fx: pe.fx, snd: pe.snd, nos: nAct, turbo: pe.turbo, red, dmg: dmgP, al: pe.snd && (pe.snd.ecu | 0) >= 5 && (pe.snd.cam | 0) >= 2, wgExt: !!(pe.bst && pe.bst.cfg !== 'sc') };
-  engP.set(player.rpm, load, live, pe.voice || pe.id, ctxP);
+  engP.set(player.rpm, load, live, engineAudioVoice(pe.voice || pe.id, pe.snd, pe.turbo, pe.bst), ctxP);
   const oLoad = opp.mode === 'stage' ? 0.8 : (opp.finished ? 0.02 : 1), oNos = !!opp.nosAud && opp.mode === 'run' && opp.tl > 1.2 && opp.tl < 3.4;
-  engO.set(opp.rpm, oLoad, live, opp.sv || opp.eng.voice || opp.eng.id, { boost: opp.boost, psi: 0, pk: 0, cut: 1, snd: opp.sndm, nos: oNos, turbo: false });
+  engO.set(opp.rpm, oLoad, live, engineAudioVoice(opp.sv || opp.eng.voice || opp.eng.id, opp.sndm, opp.eng.turbo, opp.eng.bst), { boost: opp.boost, psi: opp.psi || 0, pk: opp.eng.bst ? opp.eng.bst.pk : 0, bst: opp.eng.bst, cut: 1, snd: opp.sndm, nos: oNos, turbo: opp.eng.turbo });
   if (live && !save.mute) {
-    const vp = voiceParams(pe.voice || pe.id, pe.snd, { turbo: pe.turbo });
+    const vp = voiceParams(engineAudioVoice(pe.voice || pe.id, pe.snd, pe.turbo, pe.bst), pe.snd, { turbo: pe.turbo });
     /* lifting at speed: overrun burble from the exhaust, stronger with a bigger cam, open headers and a tune */
     if (load < 0.3 && player.rpm > 3200 && player.mode === 'run' && Math.random() < dt * 14 * vp.popP * Math.min(1, player.rpm / 6500)) engP.pop(0.3 + 0.4 * Math.random());
     if (pn && Math.random() < dt * 9) engP.pop(0.2 + 0.2 * Math.random());

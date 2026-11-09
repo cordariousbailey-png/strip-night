@@ -1,4 +1,7 @@
 const VOICE = {
+  na4:    { bk: BK.i4, body: 124, bd: 7, crack: 1.65, cd: 2.4, pipe: 350, cut: 5350, drive: 2.45, amp: .80, lope: .04, intake: .56, mech: .5, hpf: 145 },
+  turbo4: { bk: BK.i4, body: 112, bd: 8, crack: 1.35, cd: 2.9, pipe: 310, cut: 4400, drive: 2.8, amp: .88, lope: .10, intake: .34, mech: .5, whistle: 1, tw: 1, hpf: 140 },
+  camv8:  { bk: BK.chev, body: 73, bd: 14, crack: .68, cd: 3.4, pipe: 135, cut: 4250, drive: 2.5, amp: 1.08, lope: .60, intake: .28, hpf: 75 },
   v8:     { bk: BK.chev, body: 82,  bd: 11, crack: .55, cd: 3.2, pipe: 148, cut: 3536, drive: 2.0, amp: 1.0,  lope: .32, intake: .22, hpf: 85 },
   bb:     { bk: BK.chev, body: 62,  bd: 15, crack: .45, cd: 3.6, pipe: 118, cut: 3042, drive: 2.4, amp: 1.2,  lope: .48, intake: .30, hpf: 72 },
   ls:     { bk: BK.ls,   body: 100, bd: 9,  crack: .75, cd: 2.4, pipe: 190, cut: 4805, drive: 1.8, amp: .95,  lope: .10, intake: .34, hpf: 85 },
