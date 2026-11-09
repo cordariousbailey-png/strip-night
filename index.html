@@ -1857,7 +1857,7 @@ function mkEngine(vol, pan, dull, useWorklet = false) {
   const hp = biq('highpass', 68, 0.8), air = biq('highshelf', 5500, 0.7, 4), body = biq('peaking', 95, 1.1, 3), drone = biq('peaking', 120, 1.6, 3), muff = biq('lowpass', 3200, 0.8), sh = AC.createWaveShaper(), eg = AC.createGain();
   sp.connect(split); split.connect(hp, 0); hp.connect(body); body.connect(drone); drone.connect(mq1); mq1.connect(mq2); mq2.connect(f1); f1.connect(f2); f2.connect(f3); f3.connect(muff); muff.connect(air); air.connect(sh); sh.connect(eg); eg.connect(out);
   /* outdoor space: a short slap off the track walls and grandstands */
-  if (irBuf && AC.createConvolver) { const cv = AC.createConvolver(), wg = AC.createGain(); cv.buffer = irBuf; wg.gain.value = dull ? 0.22 : 0.15; out.connect(cv); cv.connect(wg); wg.connect(carBus); }
+  if (false && irBuf && AC.createConvolver) { const cv = AC.createConvolver(), wg = AC.createGain(); cv.buffer = irBuf; wg.gain.value = dull ? 0.22 : 0.15; out.connect(cv); cv.connect(wg); wg.connect(carBus); }
   const scG = AC.createGain(), scLp = biq('lowpass', 7000, 0.5); scG.gain.value = 0; split.connect(scLp, 1); scLp.connect(scG); scG.connect(out);
   /* bass enhancer: phone speakers cannot play the 40 to 100 Hz firing fundamental, so its harmonics are rebuilt where a small speaker can reproduce them */
   const bLp = biq('lowpass', 170, 0.7), bWs = AC.createWaveShaper(), bHp = biq('highpass', 130, 0.7), bG = AC.createGain(); bWs.curve = curve(3.2); bG.gain.value = 0;
@@ -1895,7 +1895,7 @@ function mkEngine(vol, pan, dull, useWorklet = false) {
       f2.gain.setTargetAtTime(3 + 1.5 * vp.exh + 2 * vk, t, 0.1);
       muff.frequency.setTargetAtTime(vp.cut * (dull ? 0.7 : 1) * (0.7 + 0.5 * load) * (1 + 0.15 * nosF) * (1 + 0.25 * vk), t, 0.06);
       eg.gain.setTargetAtTime(on ? vol * 0.9 : 0, t, 0.04);
-      out.gain.setTargetAtTime(1, t, 0.02);
+      out.gain.setTargetAtTime(0.75, t, 0.04);
       /* rpm layers: idle and low, mid, high crossfade on rpm, each shaped by throttle */
       const wl = 1 - sst(0.16, 0.42, r), wm = sst(0.16, 0.38, r) * (1 - sst(0.55, 0.8, r)), wh = sst(0.5, 0.82, r), sc = v.scream ? 1 : 0;
       lyLow.g.gain.setTargetAtTime(on ? vol * 0.30 * wl * (0.6 + 0.4 * load) : 0, t, 0.08);
@@ -1957,10 +1957,10 @@ function audioStart() {
   if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    comp = AC.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.2;
-    master = AC.createGain(); master.gain.value = 0; master.connect(comp); comp.connect(AC.destination); carBus = AC.createGain(); carBus.connect(master);
+    comp = AC.createDynamicsCompressor(); comp.threshold.value = -18; comp.knee.value = 9; comp.ratio.value = 10; comp.attack.value = 0.003; comp.release.value = 0.12;
+    master = AC.createGain(); master.gain.value = 0; master.connect(comp); comp.connect(AC.destination); carBus = AC.createGain(); carBus.gain.value = 0.62; carBus.connect(master);
     /* a short drag-strip ambience: guard-wall slap at about 35 and 80 ms and a fast-decaying tail, only on devices with enough CPU */
-    if ((navigator.hardwareConcurrency || 4) >= 4 && AC.createConvolver) {
+    if (false && (navigator.hardwareConcurrency || 4) >= 4 && AC.createConvolver) {
       const n = Math.floor(AC.sampleRate * 0.7), ir = AC.createBuffer(2, n, AC.sampleRate);
       for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < n; i++) { const t = i / AC.sampleRate; lp += 0.35 * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.exp(-t / 0.16) * 0.5; } [0.035 + 0.004 * ch, 0.08 - 0.006 * ch].forEach((tt, k) => { const j = Math.floor(tt * AC.sampleRate); d[j] += 0.5 / (k + 1); d[j + 1] += 0.25 / (k + 1); }); }
       const cv = AC.createConvolver(); cv.buffer = ir; const wet = AC.createGain(); wet.gain.value = 0.2; master.connect(cv); cv.connect(wet); wet.connect(comp);
@@ -2207,16 +2207,34 @@ const MONET = {
   },
   panel(html, onReady) { const o = $('monetOv'), b = $('monetBox'); b.innerHTML = html; o.hidden = false; if (onReady) onReady(b); return () => { o.hidden = true; b.innerHTML = ''; }; },
   /* a rewarded ad: resolves true when the player earned the reward */
-  rewarded() {
-    if (!this.demo) return (async () => {
+  async rewarded() {
+    if (this.native) {
+      if (this._rewardBusy) return false;
+      this._rewardBusy = true;
+      const A = window.Capacitor?.Plugins?.AdMob;
+      if (!A) {
+        this._rewardBusy = false;
+        alert('Rewarded ads unavailable: native AdMob plugin is missing from this APK. Rebuild with Capacitor sync.');
+        return false;
+      }
       try {
-        const A = Capacitor.Plugins.AdMob, id = MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].rewarded; let got = false;
+        if (!this._adsInitialized) {
+          await A.initialize({ initializeForTesting: MCFG.testAds });
+          this._adsInitialized = true;
+        }
+        const id = MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].rewarded;
         await A.prepareRewardVideoAd({ adId: id, isTesting: MCFG.testAds });
-        const h = await A.addListener('onRewardedVideoAdReward', () => { got = true; });
-        await A.showRewardVideoAd(); try { h.remove(); } catch (e) {}
-        return got;
-      } catch (e) { return false; }
-    })();
+        // AdMob v6 resolves showRewardVideoAd with a reward item only after earning it.
+        const reward = await A.showRewardVideoAd();
+        return !!(reward && (reward.type !== undefined || reward.amount !== undefined));
+      } catch (e) {
+        console.error('[Strip Night] Rewarded ad error:', e);
+        alert('Ad unavailable: ' + (e?.message || String(e)));
+        return false;
+      } finally {
+        this._rewardBusy = false;
+      }
+    }
     return new Promise(res => {
       let n = 3; const close = this.panel('<h2>Ad (demo)</h2><p>A real video ad would play here.</p><div class="big" id="adN">3</div><p>Reward unlocks when it ends.</p><button class="cta alt" id="adX" type="button">Cancel</button>', b => {
         $('adX').onclick = () => { clearInterval(t); close(); res(false); };
@@ -4378,7 +4396,7 @@ function musicInit() {
     for (let i = 0; i < raw.length; i++) u[i] = raw.charCodeAt(i);
     const el = new Audio(URL.createObjectURL(new Blob([u], { type: 'audio/mpeg' })));
     el.loop = true; el.preload = 'auto'; el.onerror = () => { MUS.file = null; };
-    MUS.file = el; MUS.src = AC.createMediaElementSource(el); MUS.fg = AC.createGain(); MUS.fg.gain.value = 2.4; MUS.src.connect(MUS.fg); MUS.fg.connect(MUS.bus);
+    MUS.file = el; MUS.src = AC.createMediaElementSource(el); MUS.fg = AC.createGain(); MUS.fg.gain.value = 0.85; MUS.src.connect(MUS.fg); MUS.fg.connect(MUS.bus);
     document.getElementById('musicData').textContent = '';
   } catch (e) { MUS.file = null; }
 }

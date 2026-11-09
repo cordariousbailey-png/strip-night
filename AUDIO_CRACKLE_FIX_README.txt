@@ -1,0 +1,1 @@
+Strip Night audio crackling mitigation: lowered summed car-bus gain, tamed engine output and music media gain, disabled costly convolution reverb, tightened output compression. Preserves engine profiles, audio worklet, rewarded-ad patch and sharp graphics. Requires APK rebuild and Android device test.
