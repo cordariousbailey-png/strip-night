@@ -3,10 +3,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
-env:
-  # Your AdMob APP id (has a ~ in it, not a /). Find it in AdMob > Apps > App settings.
-  # Until you replace it, builds use Google's test app id.
-  ADMOB_APP_ID: ca-app-pub-3940256099942544~3347511713
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,10 +32,12 @@ jobs:
           sed -i -E 's#gradle-[0-9.]+-(all|bin)\.zip#gradle-8.9-all.zip#' gradle/wrapper/gradle-wrapper.properties
           grep -rl "proguard-android.txt" --include=build.gradle . ../node_modules/@capacitor ../node_modules/@capacitor-community 2>/dev/null | xargs -r sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g"
           M=app/src/main/AndroidManifest.xml
-          sed -i '/ads.APPLICATION_ID/d' "$M"
-          sed -i "s#</application>#    <meta-data android:name=\"com.google.android.gms.ads.APPLICATION_ID\" android:value=\"$ADMOB_APP_ID\"/>\n    </application>#" "$M"
+          grep -q ads.APPLICATION_ID "$M" || sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>#' "$M"
           grep -q "permission.INTERNET" "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$M"
           grep -q "permission.AD_ID" "$M" || sed -i 's#<application#<uses-permission android:name="com.google.android.gms.permission.AD_ID"/>\n    <application#' "$M"
+          S=app/src/main/res/values/styles.xml
+          grep -q windowOptOutEdgeToEdgeEnforcement "$S" || sed -i 's#<style name="AppTheme.NoActionBar"[^>]*>#&\n        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>#' "$S"
+          grep -n -A3 'AppTheme.NoActionBar"' "$S"
       - name: Build debug APK
         run: |
           cd android
