@@ -2166,9 +2166,17 @@ $('coachX').onclick = () => { save.seen.tut = 1; persist(); coachOff(); };
    MCFG holds the store ids and the ad unit ids (Google's public test ids until you replace them).
    In a browser, and anywhere the native plugins are missing, MONET runs in demo mode: ads play as a short placeholder and purchases are granted
    free of charge, so nothing is ever billed outside a real store build. In the native app it uses AdMob and the store through Capacitor plugins. */
+/* Paste your real AdMob ad unit ids into ADMOB_IDS. Until all four are filled in, the game uses Google's test ads,
+   so you can never accidentally ship test ads or click your own live ads while testing. */
+const ADMOB_IDS = {
+  android: { rewarded: '', inter: '' },
+  ios: { rewarded: '', inter: '' }
+};
+const ADMOB_TEST_IDS = { android: { rewarded: 'ca-app-pub-3940256099942544/5224354917', inter: 'ca-app-pub-3940256099942544/1033173712' }, ios: { rewarded: 'ca-app-pub-3940256099942544/1712485313', inter: 'ca-app-pub-3940256099942544/4411468910' } };
+const ADMOB_LIVE = ['android', 'ios'].every(p => /^ca-app-pub-\d+\/\d+$/.test(ADMOB_IDS[p].rewarded) && /^ca-app-pub-\d+\/\d+$/.test(ADMOB_IDS[p].inter));
 const MCFG = {
-  testAds: true,
-  ads: { android: { rewarded: 'ca-app-pub-3940256099942544/5224354917', inter: 'ca-app-pub-3940256099942544/1033173712' }, ios: { rewarded: 'ca-app-pub-3940256099942544/1712485313', inter: 'ca-app-pub-3940256099942544/4411468910' } },
+  testAds: !ADMOB_LIVE,
+  ads: ADMOB_LIVE ? ADMOB_IDS : ADMOB_TEST_IDS,
   products: {
     noads: { id: 'stripnight.noads', price: '$2.99', name: 'Remove ads', note: 'No more pop-up ads between races. Optional bonus-cash ads stay available.' },
     full: { id: 'stripnight.full', price: '$4.99', name: 'Full game', note: 'Unlocks chapters two to four: The Builders, The Council, The Enforcers and Overlord.' },
@@ -2188,7 +2196,7 @@ const MONET = {
   prices: {},
   async init() {
     if (!this.native) return;
-    try { const A = Capacitor.Plugins.AdMob; if (A) await A.initialize({ initializeForTesting: MCFG.testAds }); } catch (e) {}
+    this.adsReady = this.initAds();
     try {
       const P = window.CdvPurchase; if (!P) return;
       const { store, ProductType, Platform } = P, pf = this.plat === 'ios' ? Platform.APPLE_APPSTORE : Platform.GOOGLE_PLAY;
@@ -2198,6 +2206,26 @@ const MONET = {
       await store.initialize([pf]); this.store = store; this.pf = pf;
     } catch (e) {}
   },
+  adId(kind) { return MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'][kind]; },
+  async initAds() {
+    const A = window.Capacitor?.Plugins?.AdMob; if (!A) return false;
+    try {
+      await A.initialize({ initializeForTesting: MCFG.testAds });
+      // EU/UK consent form (Google requires it there); shows nothing elsewhere
+      try { const c = await A.requestConsentInfo(); if (c && c.isConsentFormAvailable && c.status === 'REQUIRED') await A.showConsentForm(); } catch (e) {}
+      // iOS "allow tracking" prompt
+      if (this.plat === 'ios') { try { const t = await A.trackingAuthorizationStatus(); if (t && t.status === 'notDetermined') await A.requestTrackingAuthorization(); } catch (e) {} }
+      A.addListener('onRewardedVideoAdReward', () => { this._earned = true; });
+      this.preload();
+      return true;
+    } catch (e) { console.error('[Strip Night] AdMob init failed:', e); return false; }
+  },
+  /* load the next ads in the background so they show instantly instead of after a loading pause */
+  preload() {
+    const A = window.Capacitor?.Plugins?.AdMob; if (!A) return;
+    if (!this._interReady) { this._interReady = A.prepareInterstitial({ adId: this.adId('inter'), isTesting: MCFG.testAds }).then(() => true, () => { this._interReady = null; return false; }); }
+    if (!this._rewardReady) { this._rewardReady = A.prepareRewardVideoAd({ adId: this.adId('rewarded'), isTesting: MCFG.testAds }).then(() => true, () => { this._rewardReady = null; return false; }); }
+  },
   price(k) { return this.prices[k] || MCFG.products[k].price; },
   grant(k) {
     const p = MCFG.products[k]; if (!p) return;
@@ -2205,34 +2233,27 @@ const MONET = {
     if (k === 'starter') { save.cash += 25000; save.iap.noads = 1; save.iap.paint = 1; }
     persist(); try { $('cash').textContent = money(save.cash); renderGarage(); } catch (e) {}
   },
+  toast(msg) { try { let t = $('adToast'); if (!t) { t = document.createElement('div'); t.id = 'adToast'; t.style.cssText = 'position:fixed;left:50%;bottom:12%;transform:translateX(-50%);background:rgba(11,13,40,.92);color:#fff;padding:10px 16px;border-radius:10px;font:14px sans-serif;z-index:99999;max-width:85vw;text-align:center;pointer-events:none'; document.body.appendChild(t); } t.textContent = msg; t.style.opacity = '1'; clearTimeout(this._tt); this._tt = setTimeout(() => { t.style.opacity = '0'; }, 2600); } catch (e) {} },
   panel(html, onReady) { const o = $('monetOv'), b = $('monetBox'); b.innerHTML = html; o.hidden = false; if (onReady) onReady(b); return () => { o.hidden = true; b.innerHTML = ''; }; },
   /* a rewarded ad: resolves true when the player earned the reward */
   async rewarded() {
     if (this.native) {
-      if (this._rewardBusy) return false;
-      this._rewardBusy = true;
       const A = window.Capacitor?.Plugins?.AdMob;
-      if (!A) {
-        this._rewardBusy = false;
-        alert('Rewarded ads unavailable: native AdMob plugin is missing from this APK. Rebuild with Capacitor sync.');
-        return false;
-      }
+      if (!A || this._rewardBusy) return false;
+      this._rewardBusy = true; this._earned = false;
       try {
-        if (!this._adsInitialized) {
-          await A.initialize({ initializeForTesting: MCFG.testAds });
-          this._adsInitialized = true;
-        }
-        const id = MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].rewarded;
-        await A.prepareRewardVideoAd({ adId: id, isTesting: MCFG.testAds });
-        // AdMob v6 resolves showRewardVideoAd with a reward item only after earning it.
+        if (!(await this.adsReady)) return false;
+        this.preload();
+        if (!(await this._rewardReady)) { this._rewardReady = null; this.preload(); this.toast('No ad available right now. Try again in a minute.'); return false; }
+        this._rewardReady = null;
         const reward = await A.showRewardVideoAd();
-        return !!(reward && (reward.type !== undefined || reward.amount !== undefined));
+        return this._earned || !!(reward && reward.amount > 0);
       } catch (e) {
         console.error('[Strip Night] Rewarded ad error:', e);
-        alert('Ad unavailable: ' + (e?.message || String(e)));
+        this.toast('No ad available right now. Try again in a minute.');
         return false;
       } finally {
-        this._rewardBusy = false;
+        this._rewardBusy = false; this._rewardReady = null; this.preload();
       }
     }
     return new Promise(res => {
@@ -2243,7 +2264,7 @@ const MONET = {
     });
   },
   interstitial() {
-    if (!this.demo) return (async () => { try { const A = Capacitor.Plugins.AdMob; await A.prepareInterstitial({ adId: MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].inter, isTesting: MCFG.testAds }); await A.showInterstitial(); } catch (e) {} })();
+    if (!this.demo) return (async () => { const A = Capacitor.Plugins.AdMob; try { if (!(await this.adsReady)) return; this.preload(); const ok = await Promise.race([this._interReady, new Promise(r => setTimeout(() => r(false), 1500))]); if (ok) { this._interReady = null; await A.showInterstitial(); } } catch (e) {} finally { this._interReady = null; this.preload(); } })();
     return new Promise(res => {
       let n = 2; const close = this.panel('<h2>Ad (demo)</h2><p>A pop-up ad would show here between races. Remove ads in the Store.</p><button class="cta alt" id="adC" type="button" disabled>Close in 2</button>', b => {});
       const t = setInterval(() => { n--; const e = $('adC'); if (e) { e.textContent = n > 0 ? 'Close in ' + n : 'Close'; if (n <= 0) { e.disabled = false; e.onclick = () => { clearInterval(t); close(); res(); }; } } if (n < -30) { clearInterval(t); close(); res(); } }, 1000);
