@@ -2206,6 +2206,12 @@ const MONET = {
       await store.initialize([pf]); this.store = store; this.pf = pf;
     } catch (e) {}
   },
+  noAdMsg() {
+    const base = 'No ad available right now. Try again in a minute.', e = this._adErr;
+    if (!MCFG.testAds || !e) return base;
+    const d = typeof e === 'string' ? e : [e.code, e.message || e.errorMessage].filter(x => x !== undefined && x !== '').join(': ') || JSON.stringify(e);
+    return base + ' [test info: ' + d + ']';
+  },
   adId(kind) { return MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'][kind]; },
   async initAds() {
     const A = window.Capacitor?.Plugins?.AdMob; if (!A) return false;
@@ -2218,13 +2224,13 @@ const MONET = {
       A.addListener('onRewardedVideoAdReward', () => { this._earned = true; });
       this.preload();
       return true;
-    } catch (e) { console.error('[Strip Night] AdMob init failed:', e); return false; }
+    } catch (e) { this._adErr = e; console.error('[Strip Night] AdMob init failed:', e); return false; }
   },
   /* load the next ads in the background so they show instantly instead of after a loading pause */
   preload() {
     const A = window.Capacitor?.Plugins?.AdMob; if (!A) return;
-    if (!this._interReady) { this._interReady = A.prepareInterstitial({ adId: this.adId('inter'), isTesting: MCFG.testAds }).then(() => true, () => { this._interReady = null; return false; }); }
-    if (!this._rewardReady) { this._rewardReady = A.prepareRewardVideoAd({ adId: this.adId('rewarded'), isTesting: MCFG.testAds }).then(() => true, () => { this._rewardReady = null; return false; }); }
+    if (!this._interReady) { this._interReady = A.prepareInterstitial({ adId: this.adId('inter'), isTesting: MCFG.testAds }).then(() => true, e => { this._interReady = null; this._adErr = e; console.error('[Strip Night] Interstitial load failed:', e); return false; }); }
+    if (!this._rewardReady) { this._rewardReady = A.prepareRewardVideoAd({ adId: this.adId('rewarded'), isTesting: MCFG.testAds }).then(() => true, e => { this._rewardReady = null; this._adErr = e; console.error('[Strip Night] Rewarded load failed:', e); return false; }); }
   },
   price(k) { return this.prices[k] || MCFG.products[k].price; },
   grant(k) {
@@ -2242,15 +2248,15 @@ const MONET = {
       if (!A || this._rewardBusy) return false;
       this._rewardBusy = true; this._earned = false;
       try {
-        if (!(await this.adsReady)) return false;
+        if (!(await this.adsReady)) { this.toast(this.noAdMsg()); return false; }
         this.preload();
-        if (!(await this._rewardReady)) { this._rewardReady = null; this.preload(); this.toast('No ad available right now. Try again in a minute.'); return false; }
+        if (!(await this._rewardReady)) { this._rewardReady = null; this.preload(); this.toast(this.noAdMsg()); return false; }
         this._rewardReady = null;
         const reward = await A.showRewardVideoAd();
         return this._earned || !!(reward && reward.amount > 0);
       } catch (e) {
-        console.error('[Strip Night] Rewarded ad error:', e);
-        this.toast('No ad available right now. Try again in a minute.');
+        console.error('[Strip Night] Rewarded ad error:', e); this._adErr = e;
+        this.toast(this.noAdMsg());
         return false;
       } finally {
         this._rewardBusy = false; this._rewardReady = null; this.preload();
