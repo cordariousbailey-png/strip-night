@@ -2252,6 +2252,7 @@ const MONET = {
         this.preload();
         if (!(await this._rewardReady)) { this._rewardReady = null; this.preload(); this.toast(this.noAdMsg()); return false; }
         this._rewardReady = null;
+        AUDIO_HOLD.ad = true; audioHold(true);
         const reward = await A.showRewardVideoAd();
         return this._earned || !!(reward && reward.amount > 0);
       } catch (e) {
@@ -2260,6 +2261,7 @@ const MONET = {
         return false;
       } finally {
         this._rewardBusy = false; this._rewardReady = null; this.preload();
+        if (AUDIO_HOLD.ad) { AUDIO_HOLD.ad = false; audioHold(false); }
       }
     }
     return new Promise(res => {
@@ -2270,7 +2272,7 @@ const MONET = {
     });
   },
   interstitial() {
-    if (!this.demo) return (async () => { const A = Capacitor.Plugins.AdMob; try { if (!(await this.adsReady)) return; this.preload(); const ok = await Promise.race([this._interReady, new Promise(r => setTimeout(() => r(false), 1500))]); if (ok) { this._interReady = null; await A.showInterstitial(); } } catch (e) {} finally { this._interReady = null; this.preload(); } })();
+    if (!this.demo) return (async () => { const A = Capacitor.Plugins.AdMob; try { if (!(await this.adsReady)) return; this.preload(); const ok = await Promise.race([this._interReady, new Promise(r => setTimeout(() => r(false), 1500))]); if (ok) { this._interReady = null; AUDIO_HOLD.ad = true; audioHold(true); await A.showInterstitial(); } } catch (e) {} finally { this._interReady = null; this.preload(); if (AUDIO_HOLD.ad) { AUDIO_HOLD.ad = false; audioHold(false); } } })();
     return new Promise(res => {
       let n = 2; const close = this.panel('<h2>Ad (demo)</h2><p>A pop-up ad would show here between races. Remove ads in the Store.</p><button class="cta alt" id="adC" type="button" disabled>Close in 2</button>', b => {});
       const t = setInterval(() => { n--; const e = $('adC'); if (e) { e.textContent = n > 0 ? 'Close in ' + n : 'Close'; if (n <= 0) { e.disabled = false; e.onclick = () => { clearInterval(t); close(); res(); }; } } if (n < -30) { clearInterval(t); close(); res(); } }, 1000);
@@ -4452,7 +4454,7 @@ function musicTick() {
   if (!AC || !master || !noiseBuf) return;
   if (!MUS.bus) musicInit(); if (!MUS.bus) return;
   const st = $('story'), storyUp = st && !st.hidden;
-  const want = (save.music !== false && !save.mute && !AU.lab && !document.hidden && (phase === 'garage' || phase === 'done') && !replay && !DYNO.on) ? (storyUp ? 0.6 : 1) : 0;
+  const want = (save.music !== false && !save.mute && !AU.lab && !document.hidden && !AUDIO_HOLD.ad && (phase === 'garage' || phase === 'done') && !replay && !DYNO.on) ? (storyUp ? 0.6 : 1) : 0;
   MUS.bus.gain.setTargetAtTime(want * 0.34 * (save.volMus == null ? 1 : save.volMus), AC.currentTime, want ? 0.5 : 0.25);
   if (MUS.file) {
     if (want) { MUS.idle = 0; if (MUS.file.paused && AC.state === 'running') { const pr = MUS.file.play(); if (pr && pr.catch) pr.catch(() => {}); } }
@@ -4462,6 +4464,25 @@ function musicTick() {
   if (want) { MUS.idle = 0; if (!MUS.timer) { MUS.next = AC.currentTime + 0.12; MUS.timer = setInterval(() => { if (!AC || AC.state !== 'running') return; if (MUS.next < AC.currentTime - 0.05) MUS.next = AC.currentTime + 0.05; while (MUS.next < AC.currentTime + 0.9) { musicStep(MUS.step++, MUS.next); MUS.next += MS16; } }, 80); } }
   else if (MUS.timer && (MUS.idle += 1 / 60) > 2.5) { clearInterval(MUS.timer); MUS.timer = null; }
 }
+
+/* Silence everything the instant the app goes to the background or an ad opens. The frame loop that normally
+   manages the music is frozen at those moments, and on Android a still-playing soundtrack takes audio focus
+   away from the ad's video and pauses it. */
+const AUDIO_HOLD = { ad: false };
+function audioHold(on) {
+  if (on) {
+    try { if (MUS.file && !MUS.file.paused) MUS.file.pause(); } catch (e) {}
+    try { if (MUS.timer) { clearInterval(MUS.timer); MUS.timer = null; } } catch (e) {}
+    try { if (MUS.bus && AC) MUS.bus.gain.setValueAtTime(0, AC.currentTime); } catch (e) {}
+    try { if (AC && AC.state === 'running') AC.suspend().catch(() => {}); } catch (e) {}
+  } else if (!document.hidden && !AUDIO_HOLD.ad) {
+    try { if (AC && AC.state === 'suspended') AC.resume().catch(() => {}); } catch (e) {}
+  }
+}
+document.addEventListener('visibilitychange', () => audioHold(document.hidden));
+window.addEventListener('pagehide', () => audioHold(true));
+document.addEventListener('pause', () => audioHold(true));   /* Capacitor: app sent to background */
+document.addEventListener('resume', () => setTimeout(() => audioHold(false), 300));
 
 function perfWatch(ms) {
   if (document.hidden || !(ms > 0) || ms > 250) return;
