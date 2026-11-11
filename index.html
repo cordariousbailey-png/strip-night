@@ -2123,7 +2123,7 @@ let bgWasPlaying = false;
 function audioBackground(hide) {
   try {
     if (hide) {
-      bgWasPlaying = !!(MUS && MUS.file && !MUS.file.paused);
+      if (MUS && MUS.file && !MUS.file.paused) bgWasPlaying = true;
       if (MUS && MUS.file && !MUS.file.paused) MUS.file.pause();
       if (AC && AC.state === 'running') AC.suspend().catch(() => {});
     } else {
@@ -2135,6 +2135,8 @@ function audioBackground(hide) {
 }
 document.addEventListener('visibilitychange', () => audioBackground(document.hidden));
 addEventListener('pagehide', () => audioBackground(true));
+addEventListener('focus', () => { if (!document.hidden) audioBackground(false); });
+if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App && Capacitor.Plugins.App.addListener) { try { Capacitor.Plugins.App.addListener('appStateChange', s => audioBackground(!s.isActive)); } catch (e) {} }
 addEventListener('pageshow', () => { if (!document.hidden) audioBackground(false); });
 const PHONE = /Android|iPhone|iPad/i.test(navigator.userAgent) || !!window.Capacitor; /* reverb convolvers are too heavy for phone audio threads and cause crackle */
 function audioStart() {
@@ -2235,7 +2237,10 @@ function sfxResult(win) {
 function sfxBuzz() { beep(150, 0.6, 'sawtooth', 0.09); setTimeout(() => beep(142, 0.5, 'square', 0.05), 40); }
 function sfxTick() { beep(1500, 0.03, 'square', 0.025); }
 function sfxCoin() { beep(988, 0.09, 'square', 0.04); setTimeout(() => beep(1319, 0.28, 'square', 0.04), 70); }
+let audWatch = 0;
 function audioTick() {
+  /* after an ad or an interruption the audio context can stay suspended; keep trying to wake it while the app is on screen */
+  if (AC && !document.hidden && AC.state !== 'running' && performance.now() - audWatch > 700) { audWatch = performance.now(); try { AC.resume().catch(() => {}); } catch (e) {} }
   musicTick();
   if (!AC || !engP || !engO || AU.lab) return;
   if (DYNO.on && DYNO.sp && !save.mute) {
@@ -2391,8 +2396,9 @@ const MONET = {
         await A.prepareRewardVideoAd({ adId: id, isTesting: MCFG.testAds });
         const h = await A.addListener('onRewardedVideoAdReward', () => { got = true; });
         await A.showRewardVideoAd(); try { h.remove(); } catch (e) {}
+        audioBackground(false);
         return got;
-      } catch (e) { return false; }
+      } catch (e) { audioBackground(false); return false; }
     })();
     return new Promise(res => {
       let n = 3; const close = this.panel('<h2>Ad (demo)</h2><p>A real video ad would play here.</p><div class="big" id="adN">3</div><p>Reward unlocks when it ends.</p><button class="cta alt" id="adX" type="button">Cancel</button>', b => {
@@ -5638,7 +5644,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v222 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v223 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
