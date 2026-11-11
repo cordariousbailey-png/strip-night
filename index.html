@@ -593,6 +593,12 @@ body { background: var(--night); }
           <button type="button" id="stOn" aria-pressed="true">On</button>
           <button type="button" id="stOff" aria-pressed="false">Off</button>
         </div></div>
+      <div class="setrow"><span>Graphics</span>
+        <div class="seg" role="group" aria-label="Graphics">
+          <button type="button" id="gfxAuto" aria-pressed="true">Auto</button>
+          <button type="button" id="gfxHigh" aria-pressed="false">High</button>
+          <button type="button" id="gfxLow" aria-pressed="false">Low</button>
+        </div></div>
       <div class="setrow"><span>Seen scenes</span>
         <div class="seg"><button type="button" id="stReplay">Replay</button></div></div>
       <div class="setrow"><span>Music</span>
@@ -4598,7 +4604,14 @@ function musicTick() {
   else if (MUS.timer && (MUS.idle += 1 / 60) > 2.5) { clearInterval(MUS.timer); MUS.timer = null; }
 }
 
+function applyGfx() {
+  const g = save.gfx || 'auto';
+  if (g === 'high') { PERF.lvl = 0; QCAP = 2; } else if (g === 'low') { PERF.lvl = 2; QCAP = 1; } else if (PERF.lvl === 0) QCAP = 2;
+  PERF.ema = 16; PERF.t = 0;
+  try { resize(); } catch (e) {}
+}
 function perfWatch(ms) {
+  if (save.gfx === 'high' || save.gfx === 'low') return;
   if (document.hidden || !(ms > 0) || ms > 250) return;
   PERF.ema += 0.06 * (ms - PERF.ema);
   if (PERF.ema > 27) { PERF.t += ms; if (PERF.t > 2500 && PERF.lvl < 2) { PERF.lvl++; PERF.t = 0; PERF.ema = 16; QCAP = PERF.lvl === 1 ? 1.25 : 1; try { resize(); } catch (e) {} } }
@@ -5625,7 +5638,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v221 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v222 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
@@ -5647,6 +5660,10 @@ function introScene() { if (!save.seen.k2intro && !needStarter) playScene('k2int
   }, true);
   const on = stEl('stOn'), off = stEl('stOff');
   const sync = () => { on.setAttribute('aria-pressed', save.cuts !== 0 ? 'true' : 'false'); off.setAttribute('aria-pressed', save.cuts === 0 ? 'true' : 'false'); };
+  const gb = { auto: stEl('gfxAuto'), high: stEl('gfxHigh'), low: stEl('gfxLow') };
+  const gSync = () => { const g = save.gfx || 'auto'; Object.keys(gb).forEach(k => gb[k].setAttribute('aria-pressed', k === g ? 'true' : 'false')); };
+  Object.keys(gb).forEach(k => { gb[k].onclick = () => { save.gfx = k; persist(); gSync(); applyGfx(); }; });
+  gSync(); applyGfx();
   stEl('stReplay').onclick = openStoryList;
   on.onclick = () => { save.cuts = 1; persist(); sync(); }; off.onclick = () => { save.cuts = 0; persist(); sync(); }; sync();
   const mOn = $('muOn'), mOff = $('muOff'), mSync = () => { mOn.setAttribute('aria-pressed', save.music !== false ? 'true' : 'false'); mOff.setAttribute('aria-pressed', save.music === false ? 'true' : 'false'); };
