@@ -2119,8 +2119,10 @@ function mkEngine(vol, pan, dull, useWorklet = false) {
   };
 }
 /* silence everything when the app goes to the background or the screen turns off, and bring it back afterwards */
-let bgWasPlaying = false;
+let bgWasPlaying = false, AD_ON = false; /* AD_ON: a native ad is on screen, so the game stays completely silent and never asks for audio focus */
+function adAudio(on) { AD_ON = on; audioBackground(on); }
 function audioBackground(hide) {
+  if (!hide && AD_ON) return;
   try {
     if (hide) {
       if (MUS && MUS.file && !MUS.file.paused) bgWasPlaying = true;
@@ -2134,12 +2136,14 @@ function audioBackground(hide) {
   } catch (e) {}
 }
 document.addEventListener('visibilitychange', () => audioBackground(document.hidden));
+/* pointerdown wakes the audio, but never while an ad is up */
 addEventListener('pagehide', () => audioBackground(true));
 addEventListener('focus', () => { if (!document.hidden) audioBackground(false); });
 if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App && Capacitor.Plugins.App.addListener) { try { Capacitor.Plugins.App.addListener('appStateChange', s => audioBackground(!s.isActive)); } catch (e) {} }
 addEventListener('pageshow', () => { if (!document.hidden) audioBackground(false); });
 const PHONE = /Android|iPhone|iPad/i.test(navigator.userAgent) || !!window.Capacitor; /* reverb convolvers are too heavy for phone audio threads and cause crackle */
 function audioStart() {
+  if (AD_ON) return;
   if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)(PHONE ? { latencyHint: 0.1 } : undefined);
@@ -2240,7 +2244,7 @@ function sfxCoin() { beep(988, 0.09, 'square', 0.04); setTimeout(() => beep(1319
 let audWatch = 0;
 function audioTick() {
   /* after an ad or an interruption the audio context can stay suspended; keep trying to wake it while the app is on screen */
-  if (AC && !document.hidden && AC.state !== 'running' && performance.now() - audWatch > 700) { audWatch = performance.now(); try { AC.resume().catch(() => {}); } catch (e) {} }
+  if (AC && !AD_ON && !document.hidden && AC.state !== 'running' && performance.now() - audWatch > 700) { audWatch = performance.now(); try { AC.resume().catch(() => {}); } catch (e) {} }
   musicTick();
   if (!AC || !engP || !engO || AU.lab) return;
   if (DYNO.on && DYNO.sp && !save.mute) {
@@ -2395,10 +2399,9 @@ const MONET = {
         const A = Capacitor.Plugins.AdMob, id = MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].rewarded; let got = false;
         await A.prepareRewardVideoAd({ adId: id, isTesting: MCFG.testAds });
         const h = await A.addListener('onRewardedVideoAdReward', () => { got = true; });
-        await A.showRewardVideoAd(); try { h.remove(); } catch (e) {}
-        audioBackground(false);
+        adAudio(true); try { await A.showRewardVideoAd(); } finally { adAudio(false); } try { h.remove(); } catch (e) {}
         return got;
-      } catch (e) { audioBackground(false); return false; }
+      } catch (e) { adAudio(false); return false; }
     })();
     return new Promise(res => {
       let n = 3; const close = this.panel('<h2>Ad (demo)</h2><p>A real video ad would play here.</p><div class="big" id="adN">3</div><p>Reward unlocks when it ends.</p><button class="cta alt" id="adX" type="button">Cancel</button>', b => {
@@ -2408,7 +2411,7 @@ const MONET = {
     });
   },
   interstitial() {
-    if (!this.demo) return (async () => { try { const A = Capacitor.Plugins.AdMob; await A.prepareInterstitial({ adId: MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].inter, isTesting: MCFG.testAds }); await A.showInterstitial(); } catch (e) {} })();
+    if (!this.demo) return (async () => { try { const A = Capacitor.Plugins.AdMob; await A.prepareInterstitial({ adId: MCFG.ads[this.plat === 'ios' ? 'ios' : 'android'].inter, isTesting: MCFG.testAds }); adAudio(true); try { await A.showInterstitial(); } finally { adAudio(false); } } catch (e) { adAudio(false); } })();
     return new Promise(res => {
       let n = 2; const close = this.panel('<h2>Ad (demo)</h2><p>A pop-up ad would show here between races. Remove ads in the Store.</p><button class="cta alt" id="adC" type="button" disabled>Close in 2</button>', b => {});
       const t = setInterval(() => { n--; const e = $('adC'); if (e) { e.textContent = n > 0 ? 'Close in ' + n : 'Close'; if (n <= 0) { e.disabled = false; e.onclick = () => { clearInterval(t); close(); res(); }; } } if (n < -30) { clearInterval(t); close(); res(); } }, 1000);
@@ -4602,7 +4605,7 @@ function musicTick() {
   const want = (save.music !== false && !save.mute && !AU.lab && !document.hidden && (phase === 'garage' || phase === 'done') && !replay && !DYNO.on) ? (storyUp ? 0.6 : 1) : 0;
   MUS.bus.gain.setTargetAtTime(want * 0.34 * (save.volMus == null ? 1 : save.volMus), AC.currentTime, want ? 0.5 : 0.25);
   if (MUS.file) {
-    if (want) { MUS.idle = 0; if (MUS.file.paused && AC.state === 'running') { const pr = MUS.file.play(); if (pr && pr.catch) pr.catch(() => { if (++MUS.fails > 4) { MUS.file = null; } }); } }
+    if (want) { MUS.idle = 0; if (MUS.file.paused && AC.state === 'running' && !AD_ON && !document.hidden && performance.now() - (MUS.tryAt || 0) > 1000) { MUS.tryAt = performance.now(); const pr = MUS.file.play(); if (pr && pr.catch) pr.catch(e => { /* blocked or interrupted (an ad, a call): just try again in a second; only give up on a file that truly cannot play */ if (e && (e.name === 'NotAllowedError' || e.name === 'AbortError')) return; if (++MUS.fails > 4) { MUS.file = null; } }); } }
     else if (!MUS.file.paused && (MUS.idle += 1 / 60) > 2.5) MUS.file.pause();
     return;
   }
@@ -5644,7 +5647,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v223 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v225 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
