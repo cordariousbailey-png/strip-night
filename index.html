@@ -797,10 +797,10 @@ class EngSynth {
 class StripEngineProcessor extends AudioWorkletProcessor {
  constructor(options) {
   super(); this.syn = new EngSynth(sampleRate, options.processorOptions.seed);
-  this.port.onmessage = e => { const d=e.data; if(d.type==='voice') this.syn.setVoice(d.id); else if(d.type==='sc') this.syn.setSc(d.kind); else if(d.type==='pop') this.syn.pop(d.amount); else if(d.type==='params') Object.assign(this.syn.p,d.params); };
+  this.port.onmessage = e => { const d=e.data; if(d.type==='voice') this.syn.setVoice(d.id); else if(d.type==='sc') this.syn.setSc(d.kind); else if(d.type==='pop') this.syn.pop(d.amount); else if(d.type==='params') Object.assign(this.syn.p,d.params); else if(d.type==='sleep') this.asleep=!!d.on; };
  }
  process(inputs, outputs) {
-  const o=outputs[0]; if(o && o.length>=3) this.syn.process(o[0],o[1],o[2]);
+  const o=outputs[0]; if(this.asleep) return true; if(o && o.length>=3) this.syn.process(o[0],o[1],o[2]);
   return true;
  }
 }
@@ -2007,6 +2007,7 @@ function turboFlutter(sh, mm, k) {
 }
 /* one engine = the firing synth, exhaust and muffler filters, rpm layers (low, mid, high), intake and mechanical noise, a turbo model and a blower */
 function mkEngine(vol, pan, dull, useWorklet = false) {
+  let asleep = false; /* a sleeping engine does no synthesis at all (the far opponent) */
   const biq = (type, f, q, g) => { const b = AC.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; if (g != null) b.gain.value = g; return b; };
   const out = AC.createGain(), pn = AC.createStereoPanner ? AC.createStereoPanner() : null;
   out.gain.value = 0; if (pn) { pn.pan.value = pan; out.connect(pn); pn.connect(carBus); } else out.connect(carBus);
@@ -2015,7 +2016,7 @@ function mkEngine(vol, pan, dull, useWorklet = false) {
     ? new AudioWorkletNode(AC, 'strip-engine', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [3], processorOptions: { seed: dull ? 99123 : 12345 } })
     : AC.createScriptProcessor(4096, 0, 3);
   const split = AC.createChannelSplitter(3);
-  if (!useWorklet) sp.onaudioprocess = e => { syn.process(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.getChannelData(2)); };
+  if (!useWorklet) sp.onaudioprocess = e => { if (asleep) return; syn.process(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.getChannelData(2)); };
   const P = useWorklet ? { rpm:900, load:0.1, amp:0, cut:1, nos:0, lope:.3, crack:.5, pipe:150, g:.6, scKind:0, scAmp:0, scRatio:6, on:0, skew:1.035, dmg:0 } : syn.p;
   const send = (type, data) => { if (useWorklet) sp.port.postMessage({ type, ...data }); };
   const mq1 = biq('peaking', 380, 0.9, 4), mq2 = biq('peaking', 760, 0.9, 3), f1 = biq('peaking', 240, 1.3, 3), f2 = biq('peaking', 640, 1.6, 4), f3 = biq('peaking', 1500, 1.1, 3);
@@ -2036,6 +2037,8 @@ function mkEngine(vol, pan, dull, useWorklet = false) {
   const whoosh = noiseBand('bandpass', 1400, 0.9), surge = noiseBand('bandpass', 700, 1.6);
   let curId = '', lastT = AC.currentTime, vts = 0, shaft = 0, prevThr = 0, atBoost = false, alT = 0, lastRpm = 0;
   return {
+    sleep(b) { b = !!b; if (b === asleep) return; asleep = b; if (useWorklet) send('sleep', { on: b }); },
+    get asleep() { return asleep; },
     pop(a) { if (a == null) a = 0.5; if (useWorklet) send('pop', {amount:a}); else syn.pop(a); },
     get shaft() { return shaft; }, get vtec() { return vts; },
     set(rpm, load, on, id, c) {
@@ -2270,13 +2273,17 @@ function audioTick() {
   const ctxP = { boost: player.boost, psi: player.psi || 0, pk: pe.bst ? pe.bst.pk : 0, bst: pe.bst, cut: cutP, fx: pe.fx, snd: pe.snd, nos: nAct, turbo: pe.turbo, red, dmg: dmgP, al: pe.snd && (pe.snd.ecu | 0) >= 5 && (pe.snd.cam | 0) >= 2, wgExt: !!(pe.bst && pe.bst.cfg !== 'sc') };
   engP.set(player.rpm, load, live, pe.voice || pe.id, ctxP);
   const oLoad = opp.mode === 'stage' ? 0.8 : (opp.finished ? 0.02 : 1), oNos = !!opp.nosAud && opp.mode === 'run' && opp.tl > 1.2 && opp.tl < 3.4;
-  engO.set(opp.rpm, oLoad, live, opp.sv || opp.eng.voice || opp.eng.id, { boost: opp.boost, psi: 0, pk: 0, cut: 1, snd: opp.sndm, nos: oNos, turbo: false });
+  /* the opponent's engine only needs to be heard at the start or when the race is close, so it sleeps (no synthesis) the rest of the time */
+  const nearOpp = !live || player.mode !== 'run' || player.tl < 3.5 || Math.abs(opp.x - player.x) < 22;
+  AU.farT = nearOpp ? 0 : (AU.farT || 0) + dt;
+  if (AU.farT > 0.8) engO.sleep(true);
+  else { engO.sleep(false); engO.set(opp.rpm, oLoad, live && nearOpp, opp.sv || opp.eng.voice || opp.eng.id, { boost: opp.boost, psi: 0, pk: 0, cut: 1, snd: opp.sndm, nos: oNos, turbo: false }); }
   if (live && !save.mute) {
     const vp = voiceParams(pe.voice || pe.id, pe.snd, { turbo: pe.turbo });
     /* lifting at speed: overrun burble from the exhaust, stronger with a bigger cam, open headers and a tune */
     if (load < 0.3 && player.rpm > 3200 && player.mode === 'run' && Math.random() < dt * 14 * vp.popP * Math.min(1, player.rpm / 6500)) engP.pop(0.3 + 0.4 * Math.random());
     if (pn && Math.random() < dt * 9) engP.pop(0.2 + 0.2 * Math.random());
-    if (opp.mode === 'run' && opp.finished && Math.random() < dt * 5) engO.pop(0.2);
+    if (opp.mode === 'run' && opp.finished && !engO.asleep && Math.random() < dt * 5) engO.pop(0.2);
   }
   AU.ld = load;
   if (!live || save.mute) { windN.g.gain.setTargetAtTime(0, t, 0.1); hissN.g.gain.setTargetAtTime(0, t, 0.1); squealN.g.gain.setTargetAtTime(0, t, 0.05); AU.gear = player.gear; AU.nos = player.nos; return; }
@@ -5647,7 +5654,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v225 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v226 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
