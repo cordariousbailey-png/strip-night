@@ -35,6 +35,7 @@ jobs:
           grep -q ads.APPLICATION_ID "$M" || sed -i 's#</application>#    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>\n    </application>#' "$M"
           grep -q "permission.INTERNET" "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.INTERNET"/>\n    <application#' "$M"
           grep -q "permission.AD_ID" "$M" || sed -i 's#<application#<uses-permission android:name="com.google.android.gms.permission.AD_ID"/>\n    <application#' "$M"
+          grep -q "permission.VIBRATE" "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.VIBRATE"/>\n    <application#' "$M"
           S=app/src/main/res/values/styles.xml
           grep -q windowOptOutEdgeToEdgeEnforcement "$S" || sed -i 's#<style name="AppTheme.NoActionBar"[^>]*>#&\n        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>#' "$S"
           grep -n -A3 'AppTheme.NoActionBar"' "$S"
