@@ -783,6 +783,37 @@ body, #app { background:#08080e; }
 .unl-card i { margin-top: 6px; font: 700 11px var(--f-mono); letter-spacing: .18em; color: #8f84a8; font-style: normal; }
 @media (orientation: landscape) and (max-height: 600px) { .unl-card { padding: 12px 16px; gap: 4px; } .unl-card canvas { width: 200px; } .unl-card b { font-size: 28px; } }
 @media (prefers-reduced-motion: reduce) { .unl-rays { animation: none; } .unl-card { animation: none; } }
+
+/* v242 — Shop layout: compact stats, sticky scrolling part tabs, solid nav bar, room above the Race button */
+#shopTabs { display: flex; grid-auto-flow: row; width: auto; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; gap: 4px; border: 0; border-radius: 0; background: #0a0b1c; margin: 0 -2px 10px; padding: 6px 2px; position: sticky; top: 58px; z-index: 6; }
+#shopTabs::-webkit-scrollbar { display: none; }
+#shopTabs button { flex: 1 1 auto; min-height: 40px; padding: 0 6px; font-size: 11px; border: 1px solid #3a4aa0; border-radius: 8px; background: #0b1038; white-space: nowrap; letter-spacing: .04em; }
+#shopTabs button[aria-pressed="true"] { border-color: transparent; background: #e53a60; color: #fff; box-shadow: 0 0 10px rgba(229,58,96,.45); }
+@media (orientation: landscape) and (max-height: 600px) {
+  #garage .sheet > .gbar { background: linear-gradient(180deg, #0a0b1c 86%, rgba(10,11,28,0)); padding-bottom: 8px; }
+  #garage .sheet { padding-bottom: 74px; }
+  #garage .gstage .prev { height: clamp(140px, calc(100vh - 120px), 340px); }
+  #btnStage { box-shadow: 0 -10px 16px 8px rgba(8,8,14,.92); }
+  #shopTabs { top: 54px; }
+  .sec[data-gt="shop"] > h2 { display: none; }
+  .sec[data-gt="shop"] > .stats { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 10px 12px 8px; margin-bottom: 6px; cursor: pointer; }
+  .sec[data-gt="shop"] .stats .prhead { gap: 12px; }
+  .sec[data-gt="shop"] .stats .prnum { font-size: 40px; min-width: 70px; }
+  .sec[data-gt="shop"] .stats .prclass { font-size: 18px; }
+  .sec[data-gt="shop"] .stats .prsub { font-size: 11px; margin-top: 2px; }
+  .sec[data-gt="shop"] .stats #bars { display: grid !important; grid-template-columns: 1fr 1fr; gap: 5px 16px; margin-top: 0; }
+  .sec[data-gt="shop"] .stats .sbar { grid-template-columns: 46px 1fr 56px; gap: 7px; font-size: 10px; letter-spacing: .06em; }
+  .sec[data-gt="shop"] .stats .sbar .val { font-size: 11px; }
+  .stats:not(.open) .dynocv, .stats:not(.open) .dyno { display: none !important; }
+  .stats.open .dynocv { display: block !important; } .stats.open .dyno { display: block !important; }
+  .sec[data-gt="shop"] .stats .more { display: block !important; margin: 2px 0 0; font-size: 10px; }
+}
+
+/* v244 — Black Market has its own tab and card */
+.gtabs button[hidden] { display: none !important; }
+.bmcard { border: 1px solid #a8324a; border-radius: 6px 16px 6px 16px; padding: 12px; background: linear-gradient(180deg, #2a0f26 0%, #120a1e 55%, #0a0b1c 100%); box-shadow: inset 0 1px 0 rgba(255,120,150,.18), 0 0 22px rgba(255,59,92,.14); }
+.bmcard .bhead { background: rgba(8,6,20,.55); border-color: #6a2a4a; }
+.bmcard .bgrp { color: #ff6b86; }
 </style>
 
 <div id="app">
@@ -917,6 +948,9 @@ body, #app { background:#08080e; }
         <p class="dypk" id="dyPeak"></p>
         <div class="dyacts"><button class="cta" id="dyRun" type="button">Run pull</button><button class="cta alt" id="dyClear" type="button">Clear last pull</button></div>
       </div>
+    </section>
+    <section class="sec" data-gt="market" id="marketSec"><h2>Black Market</h2>
+      <div class="bmcard" id="marketList"></div>
     </section>
     <section class="sec" data-gt="looks"><h2>Paint and looks</h2>
       <div id="looks"></div>
@@ -2594,7 +2628,7 @@ function audioTick() {
   windN.g.gain.setTargetAtTime(sp * sp * 0.22, t, 0.15); windN.fl.frequency.setTargetAtTime(400 + sp * 1500, t, 0.15);
   hissN.g.gain.setTargetAtTime(nAct > 0 ? 0.02 + 0.016 * nAct : 0, t, 0.06); hissN.fl.frequency.setTargetAtTime(3200 + 500 * nAct, t, 0.1);
   const burn = phase === 'burnout' && gasHeld;
-  const sq = burn ? 0.12 : (player.spin && player.mode === 'run' && !player.finished ? 0.14 : 0);
+  const sq = burn ? 0.12 : opp._bo ? 0.07 : (player.spin && player.mode === 'run' && !player.finished ? 0.14 : 0);
   squealN.g.gain.setTargetAtTime(sq, t, 0.05); squealN.fl.frequency.setTargetAtTime(1900 + Math.sin(performance.now() / 90) * 220 + (burn ? 0 : 400), t, 0.05);
   if (player.mode !== 'run') { AU.gear = 1; AU.fin = false; }
   else {
@@ -2776,6 +2810,7 @@ function maybeInterstitial() {
 function startRaceNow() {
   audioStart(); AU.purged = false; AU.stage = 0; sfxStart();
   newRace();
+  { const rd = (rivalTrim(RIVALS[save.rival]) || {}).dr || 'r'; opp._dr = rd; opp.boDelay = 0.25 + Math.random() * 0.5; opp.boDur = rd === 'a' ? 1.2 : 1.8 + Math.random() * 1.1; opp.boT = 0; opp._bo = false; }
   phase = 'burnout'; phaseT = 0;
   $('garage').hidden = true; $('slipSheet').hidden = true;
   setGo('Launch', 'hold, release on green'); goArmed = false; $('btnGo').classList.remove('on');
@@ -2784,7 +2819,22 @@ function startRaceNow() {
   setHint('Burnout: hold GAS to heat the ' + (/^Front/.test(curCar().drive) ? 'front' : 'rear') + ' tires for extra grip. Tap GO to skip.');
   coach('Tutorial 1 of 5', 'Hold GAS for a burnout', 'Heats the tires for extra grip. Or tap GO to skip it.', ['btnGas']);
 }
-const smokeX = r => r.x - (r === player && /^Front/.test(curCar().drive) ? 0.9 : 3.3) + Math.random() * 0.6;
+const smokeX = r => r.x - ((r === player ? /^Front/.test(curCar().drive) : r._dr === 'f') ? 0.9 : 3.3) + Math.random() * 0.6;
+/* the rival does a burnout too: it waits a beat, lights the tires for a couple of seconds, then settles back to idle before staging */
+function rivalBurn(h) {
+  if (!opp || opp.mode !== 'stage' || opp.boDur === undefined || (phase !== 'burnout' && phase !== 'stage')) { if (opp) opp._bo = false; return; }
+  opp.boT += h;
+  const t = opp.boT - opp.boDelay;
+  if (t >= 0 && t <= opp.boDur) {
+    opp._bo = true; opp.wang += 44 * h;
+    const goal = Math.max(3800, (opp.target || 5600) * 0.92) + Math.sin(opp.boT * 31) * 170;
+    opp.rpm += (goal - opp.rpm) * Math.min(1, h * 9);
+    if (Math.random() < h * 110) particles.push({ r: 1, x: smokeX(opp), oy: 0, rad: 5 + Math.random() * 4, life: 1 });
+  } else {
+    opp._bo = false;
+    if (opp.rpm > 1150) opp.rpm += (1100 - opp.rpm) * Math.min(1, h * 6);
+  }
+}
 function onScr() {
   if (phase !== 'run') return;
   const fired = player.nos > 0;
@@ -2853,6 +2903,7 @@ const tbHold = () => save.tb > 0 && goArmed && (phase === 'stage' || phase === '
 function update(h) {
   if (phase === 'garage' || phase === 'done') return;
   phaseT += h;
+  rivalBurn(h);
   if (phase !== 'foul') coachTick();
 
   if (player.mode === 'stage') player.rev(h, gasHeld && phase !== 'foul', tbHold() ? Math.min(save.tbr, player.eng.red - 300) : 0);
@@ -3102,24 +3153,26 @@ function endRace(wasFoul) {
 
 /* ---------- garage ui ---------- */
 let gTab = 'race';
-const GTABS = [['race', 'Race'], ['cars', 'Cars'], ['engines', 'Engines'], ['shop', 'Shop'], ['dyno', 'Dyno'], ['looks', 'Looks'], ['store', 'Store']];
+const GTABS = [['race', 'Race'], ['cars', 'Cars'], ['engines', 'Engines'], ['shop', 'Shop'], ['dyno', 'Dyno'], ['looks', 'Looks'], ['market', 'Market'], ['store', 'Store']];
 const GICON = {
   race: '<path d="M5 21V4M5 4h13l-2.5 4L18 12H5"/>',
   cars: '<path d="M3 16v-3.5L5.5 7h13L21 12.5V16M3 16h18M7.5 19.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zM16.5 19.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z"/>',
   engines: '<path d="M8 8V5h6v3M5 8h12v10H5zM17 11h3v4h-3M5 12H3"/>',
   shop: '<path d="M14.5 5.5a4 4 0 00-5 5L4 16l4 4 5.5-5.5a4 4 0 005-5l-2.5 2.5-2.5-.5-.5-2.5z"/>',
   dyno: '<path d="M4 17a8 8 0 1116 0M12 17l4-6M7 17h.01M17 17h.01"/>',
-  looks: '<path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/>'
+  looks: '<path d="M4 20l4-1L19 8l-3-3L5 16zM14 7l3 3"/>',
+  market: '<path d="M3 7h12v9H3zM15 10h3.5L21 13v3h-6M7.5 19.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6zM17.5 19.5a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z"/>'
 };
-const GLABEL = { race: 'Race', cars: 'Garage', engines: 'Engine', shop: 'Shop', dyno: 'Dyno', looks: 'Paint' };
+const GLABEL = { race: 'Race', cars: 'Garage', engines: 'Engine', shop: 'Shop', dyno: 'Dyno', looks: 'Paint', market: 'Market' };
 function applyGTab() {
   const T = $('gtabs');
+  if (gTab === 'market' && !bmOpen()) gTab = 'race';
   if (!T.firstChild) GTABS.filter(t => GICON[t[0]]).forEach(t => {
     const b = document.createElement('button'); b.type = 'button'; b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + GICON[t[0]] + '</svg><span>' + GLABEL[t[0]] + '</span>'; b.dataset.t = t[0]; b.setAttribute('role', 'tab');
     b.onclick = () => { if (gTab === t[0]) return; if (DYNO.on) dynoStop(false); gTab = t[0]; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0); };
     T.appendChild(b);
   });
-  [...T.children].forEach(b => b.setAttribute('aria-selected', b.dataset.t === gTab ? 'true' : 'false'));
+  [...T.children].forEach(b => { b.setAttribute('aria-selected', b.dataset.t === gTab ? 'true' : 'false'); if (b.dataset.t === 'market') b.hidden = !bmOpen(); });
   document.querySelectorAll('#garage [data-gt]').forEach(el => el.classList.toggle('gt-off', el.dataset.gt !== gTab));
   $('gCash').textContent = save.cash >= 1e6 ? '$' + (save.cash / 1e6).toFixed(2) + 'M' : money(save.cash); $('gCash').title = money(save.cash);
 }
@@ -3262,6 +3315,7 @@ function renderGarage() {
   $('records').innerHTML = '<span>Best <b>' + (save.best === null ? 'none yet' : save.best.toFixed(3) + ' s') + '</b></span><span>Rivals beaten <b>' + wins + ' of ' + NREAL + '</b></span><span>Stars <b>' + RIVALS.reduce((a, r, i) => a + starCount(i), 0) + ' of ' + NREAL * 3 + '</b></span>' + (soakNow() > 0.05 ? '<span>Heat soak <b>' + Math.round(soakNow() * 100) + '%</b></span>' : '');
   $('btnSound').setAttribute('aria-pressed', save.mute ? 'false' : 'true');
   $('btnStage').textContent = 'Race ' + RIVALS[save.rival].name;
+  if (gTab === 'market') { const M = $('marketList'); M.textContent = ''; if (bmOpen()) renderBlack(M); }
   renderLooks(); renderStage(); drawPreview(); renderStats(); try { renderHub(); } catch (e) {} if (gTab === 'dyno') { if (DYNO.on) dynoStop(false); else renderDynoTab(); }
 }
 function switchCar(id) {
@@ -3789,9 +3843,9 @@ function renderBlack(U) {
   persist();
 }
 function renderShop() {
-  if (shopTab === 'blk' && !bmOpen()) shopTab = 'eng';
+  if (shopTab === 'blk') shopTab = 'eng';
   const T = $('shopTabs'); T.textContent = '';
-  [['eng', 'Tune'], ['bld', 'Builder'], ['drv', 'Drivetrain'], ['chs', 'Chassis']].concat(bmOpen() ? [['blk', 'Black Market']] : []).forEach(t => {
+  [['eng', 'Tune'], ['bld', 'Builder'], ['drv', 'Drivetrain'], ['chs', 'Chassis']].forEach(t => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = t[1];
     b.setAttribute('aria-pressed', shopTab === t[0] ? 'true' : 'false');
     b.onclick = () => { shopTab = t[0]; renderShop(); };
@@ -3936,7 +3990,7 @@ function renderStats() {
   const rows = [
     ['Power', clamp01(hp / 800), hp + ' hp'], ['Grip', clamp01((sp.mu - 1.1) / 0.6), sp.mu.toFixed(2)],
     ['Weight', clamp01(1 - (kg - 1000) / 700), kg + ' kg'], ['60 ft', clamp01((2.4 - e.s60) / 1.0), e.s60.toFixed(2) + ' s'],
-    ['Trap mph', clamp01((e.mph - 90) / 70), Math.round(e.mph) + ' mph']
+    ['Trap', clamp01((e.mph - 90) / 70), Math.round(e.mph) + ' mph']
   ];
   const B = $('bars'); B.textContent = '';
   rows.forEach(r => {
@@ -4413,6 +4467,7 @@ function paintImg(key, tn, im) {
   }
   c.putImageData(id, 0, 0); return (TINT_CACHE[ck] = cv);
 }
+let DRAW_N = 0; /* counts drawn frames, so per-frame work is done once per car even when it is drawn twice */
 const IMG_HOOK = {}; /* screens that must redraw once a car sprite finishes loading */
 function carImg(key) {
   let im = PHOTO_IMG[key];
@@ -4426,11 +4481,11 @@ function carImg(key) {
 function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt) {
   const ih = L * ph.ar, nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height, lift = ph.ex * L;
   // wheel spin: cap the visible rotation speed and blur beyond it, so fast wheels never strobe
-  let d = r._pw === undefined ? 0 : r.wang - r._pw; r._pw = r.wang; if (!(d > 0)) d = 0;
-  r._va = (r._va || 0) + Math.min(d, 0.2);
-  const sweep0 = d > 0.2 ? Math.min(d, 3.2) : 0, va0 = r._va;
+  /* worked out once per frame per car: the wet-floor reflection draws each car a second time, and that second look used to eat the spin and the blur */
+  if (r._pf !== DRAW_N) { r._pf = DRAW_N; let d1 = r._pw === undefined ? 0 : r.wang - r._pw; r._pw = r.wang; if (!(d1 > 0)) d1 = 0; r._dd = d1; r._va = (r._va || 0) + Math.min(d1, 0.48); }
+  const d = r._dd || 0, sweep0 = d > 0.35 ? Math.min(d, 3.2) : 0, va0 = r._va;
   /* burnout: only the driven wheels turn (rear on rear-drive, front on front-drive), the others hold still */
-  const frz = phase === 'burnout' && !!dr; if (!frz) r._fz = undefined;
+  const frz = (phase === 'burnout' || !!r._bo) && !!dr; if (!frz) r._fz = undefined;
   const mx = ph.wh.reduce((a, q) => a + q[0], 0) / ph.wh.length, still = i => frz && !(dr === 'a' || (dr === 'r' && ph.wh[i][0] < mx) || (dr === 'f' && ph.wh[i][0] >= mx));
   const vaOf = i => still(i) ? (r._fz === undefined ? (r._fz = va0) : r._fz) : va0, swOf = i => still(i) ? 0 : sweep0;
   ctx.save(); ctx.translate(0, -lift);
@@ -4639,7 +4694,7 @@ function fxStep(p) {
   FX.blue += ((p.nos > 0 && !p.finished ? 1 : 0) - FX.blue) * Math.min(1, dt * 6);
 }
 function draw() {
-  const p = player, o = opp;
+  const p = player, o = opp; DRAW_N++;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   try { fxStep(p); } catch (e) {}
   { const sh = FX_CALM || replay ? 0 : Math.max(FX.shake, p.nos > 0 && !p.finished ? 0.22 : 0);
@@ -6118,7 +6173,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v240 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v244 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
