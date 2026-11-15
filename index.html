@@ -135,6 +135,7 @@ button:disabled { cursor: default; }
 #story .sname { font: 900 18px "Big Shoulders Display", Impact, sans-serif; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
 #story .stxt { font: 500 15px/1.45 "IBM Plex Mono", monospace; color: var(--paper); min-height: 44px; }
 #story .scar.nocar { opacity: 0 !important; }
+#story .scar:not([src]), #story .scar[src=""] { visibility: hidden; }
 #story .schoice { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 #story .schoice button { padding: 12px 14px; border-radius: 10px; border: 1px solid #ffa83d; background: rgba(255,168,61,.12); color: var(--paper); font: 700 14px "IBM Plex Mono", monospace; text-align: left; }
 #story .shint { position: absolute; right: 12px; bottom: 5px; font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
@@ -6575,7 +6576,7 @@ function playScene(key, steps, done, opts) {
       s.choice.forEach(o => { const b = document.createElement('button'); b.type = 'button'; b.textContent = o.t; b.onclick = ev => { ev.stopPropagation(); wrap.remove(); ST.choosing = false; if (o.set) { (save.sf = save.sf || {})[o.set] = o.val; try { persist(); } catch (e) {} } ST.steps.splice.apply(ST.steps, [ST.i + 1, 0].concat(buildScene(o.reply, null))); next(); }; wrap.appendChild(b); });
       box.insertBefore(wrap, box.querySelector('.shint')); return;
     }
-    if (s.title) { ti.hidden = false; ti.innerHTML = ''; const a = document.createElement('b'), b = document.createElement('i'); a.textContent = s.title; b.textContent = s.sub || ''; ti.appendChild(a); ti.appendChild(b); box.hidden = true; car.classList.remove('in'); sCh.classList.remove('in'); drawCity(sCt, '#ff6a00', ST.seed); bg.style.background = 'radial-gradient(90% 60% at 50% 40%, rgba(255,106,0,.25), rgba(5,6,18,.55) 80%)'; return; }
+    if (s.title) { ti.hidden = false; ti.innerHTML = ''; const a = document.createElement('b'), b = document.createElement('i'); a.textContent = s.title; b.textContent = s.sub || ''; ti.appendChild(a); ti.appendChild(b); box.hidden = true; car.classList.remove('in'); car.style.opacity = ''; sCh.classList.remove('in'); drawCity(sCt, '#ff6a00', ST.seed); bg.style.background = 'radial-gradient(90% 60% at 50% 40%, rgba(255,106,0,.25), rgba(5,6,18,.55) 80%)'; return; }
     ti.hidden = true; box.hidden = false;
     const rvN = s.who && !s.mack ? rivalOf(s.who) : null; nm.textContent = (s.who || '') + (rvN ? '  \u00b7  ' + rvN.car : ''); nm.style.color = s.col; nm.style.display = s.who ? '' : 'none'; box.className = 'sbox' + (s.who ? '' : ' nar');
     bg.style.background = 'radial-gradient(90% 60% at 50% 40%, ' + s.col + '33, rgba(5,6,18,.55) 80%)';
@@ -6586,7 +6587,7 @@ function playScene(key, steps, done, opts) {
     const ph = s.img ? PHOTOS[s.img] : (s.mack || !s.who ? PHOTOS[curCar().trim.img] : null);
     car.classList.toggle('nocar', SBG_NC.has(s.bg));
     if (ph && ph.src && !SBG_NC.has(s.bg)) { if (car.dataset.k !== (s.img || 'me')) { car.classList.remove('in'); void car.offsetWidth; } car.dataset.k = s.img || 'me'; car.src = storyCar(s, ph); car.style.filter = 'drop-shadow(0 0 22px ' + s.col + '99)'; car.classList.add('in'); car.style.opacity = s.mack || !s.who ? '.45' : '1'; }
-    else car.classList.remove('in');
+    else { car.classList.remove('in'); car.style.opacity = ''; }
     if (s.boss) { try { sfxStart(); } catch (e) {} }
     ST.full = s.t; tx.textContent = ''; { const h = document.querySelector('#sBox .shint'); if (h) h.textContent = (ST.i + 1) + ' / ' + ST.steps.length + '  \u00b7  Tap to continue'; }
     if (reduce) { tx.textContent = s.t; ST.typing = false; return; }
@@ -6712,7 +6713,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v250 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v251 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) $('tBackup').hidden = false;
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
