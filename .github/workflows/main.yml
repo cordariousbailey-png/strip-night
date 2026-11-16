@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+env:
+  APP_ID: com.midnightgrudge.stripnight
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,6 +19,10 @@ jobs:
           java-version: 17
       - name: Prepare web files
         run: mkdir -p www resources && cp index.html www/ && cp icon.png splash.png resources/
+      - name: Set app id
+        run: |
+          sed -i -E "s#\"appId\": *\"[^\"]*\"#\"appId\": \"$APP_ID\"#" capacitor.config.json
+          grep appId capacitor.config.json
       - name: Install and create Android project
         run: |
           npm install
@@ -83,6 +89,11 @@ jobs:
           }
           JAVAEOF
           echo "MainActivity rewritten for immersive mode ($PKG)"
+      - name: Set version
+        run: |
+          cd android
+          sed -i -E "s/versionCode [0-9]+/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"1.0.${{ github.run_number }}\"/" app/build.gradle
+          grep -n "versionCode\|versionName" app/build.gradle
       - name: Build debug APK
         run: |
           cd android
@@ -92,3 +103,22 @@ jobs:
         with:
           name: strip-night-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Build signed Play Store bundle
+        env:
+          KS_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.UPLOAD_KEY_ALIAS }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "No keystore secret set, skipping the signed bundle."; exit 0; fi
+          cd android
+          ./gradlew bundleRelease --stacktrace
+          echo "$KS_B64" | base64 -d > upload.keystore
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          jarsigner -sigalg SHA256withRSA -digestalg SHA-256 -keystore upload.keystore -storepass "$KS_PASS" -keypass "$KS_PASS" "$AAB" "$KS_ALIAS"
+          jarsigner -verify "$AAB" | head -3
+          rm upload.keystore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strip-night-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: ignore
