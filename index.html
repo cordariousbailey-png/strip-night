@@ -1808,13 +1808,11 @@ const CONDS = [
   { id: 'clear', name: 'Clear and calm', grip: 1, pw: 1, rho: 1, wind: 0, pz: 1, temp: [62, 72], w: 30, tip: 'No surprises.' },
   { id: 'cool', name: 'Cool and dry', grip: 1.03, pw: 1.025, rho: 1.04, wind: 0, pz: 1, temp: [44, 54], w: 14, tip: 'Dense air: more power and more grip, a little more drag.' },
   { id: 'hot', name: 'Hot night', grip: 0.96, pw: 0.965, rho: 0.96, wind: 0, pz: 1.05, temp: [86, 96], w: 14, tip: 'Thin air: less power, less grip. Engines soak heat.' },
-  { id: 'damp', name: 'Damp track', grip: 0.88, pw: 1.01, rho: 1.03, wind: 0, pz: 1.08, temp: [52, 62], w: 14, tip: 'Wet asphalt: easier to spin. Ease the throttle off the line.' },
-  { id: 'rain', name: 'Light rain', grip: 0.78, pw: 1.01, rho: 1.03, wind: 0, pz: 1.15, temp: [50, 60], w: 8, tip: 'Slick. Short first gear, soft launch, patience.' },
   { id: 'tail', name: 'Tailwind', grip: 1, pw: 1, rho: 1, wind: 3.6, pz: 1, temp: [60, 70], w: 10, tip: 'A push down the track: quicker and faster through the traps.' },
   { id: 'head', name: 'Headwind', grip: 1, pw: 1, rho: 1, wind: -3.6, pz: 1.03, temp: [60, 70], w: 10, tip: 'Pushing against the air: slower, and top speed drops.' }
 ];
 let COND = NEUTRAL_COND, condStale = true;
-const wetWeekend = () => { const d = new Date().getDay(); return d === 5 || d === 6; };
+const wetWeekend = () => false; /* no rain or wet tracks */
 function rollCond() { const wk = wetWeekend() ? c => (c.id === 'damp' || c.id === 'rain' ? 2.5 : 1) : () => 1; let t = 0; for (const c of CONDS) t += c.w * wk(c); let r = Math.random() * t, pick = CONDS[0]; for (const c of CONDS) { r -= c.w * wk(c); if (r <= 0) { pick = c; break; } } const lo = pick.temp[0], hi = pick.temp[1]; return Object.assign({}, pick, { temp: Math.round(lo + Math.random() * (hi - lo)) }); }
 class Racer {
   constructor(o) {
@@ -3849,14 +3847,13 @@ const CH_T = [
   { id: 'win3', txt: 'Win 3 races', need: 3, ok: e => e.win },
   { id: 'margin', txt: 'Win by 0.10 s or more', need: 1, ok: e => e.win && e.margin >= 0.10 },
   { id: 'launch', txt: 'Land an A or S launch', need: 1, ok: e => e.grade === 'S' || e.grade === 'A' },
-  { id: 'wet', txt: 'Win on a damp or rainy track', need: 1, ok: e => e.win && (e.cond === 'damp' || e.cond === 'rain') },
   { id: 'hot', txt: 'Win on a hot night', need: 1, ok: e => e.win && e.cond === 'hot' },
   { id: 'head', txt: 'Win into a headwind', need: 1, ok: e => e.win && e.cond === 'head' },
   { id: 'nonos', txt: 'Win without nitrous', need: 1, ok: e => e.win && !e.nos, nos: 1 },
   { id: 'streak2', txt: 'Win 2 races in a row', need: 2, ok: e => e.win, strk: 1 }
 ];
 function challengesToday() {
-  const day = dayKey(); if (!save.ch || save.ch.d !== day) {
+  const day = dayKey(); if (!save.ch || save.ch.d !== day || save.ch.list.some(it => !CH_T.some(t => t.id === it.id))) {
     let h = 5; for (let c = 0; c < day.length; c++) h = (h * 33 + day.charCodeAt(c)) >>> 0; const rnd = () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
     const pool = CH_T.filter(t => !t.nos || save.nos > 0), list = []; while (list.length < 3 && pool.length) { const t = pool.splice(Math.floor(rnd() * pool.length), 1)[0]; if (list.some(x => x.id === 'win2' || x.id === 'win3' || x.id === 'streak2') && (t.id === 'win2' || t.id === 'win3' || t.id === 'streak2')) continue; list.push({ id: t.id, n: 0, done: false }); }
     save.ch = { d: day, list };
@@ -5565,7 +5562,7 @@ function draw() {
     if (k > 0) { const tt = performance.now() / 1000; ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,' + (0.16 + 0.3 * k).toFixed(3) + ')'; ctx.lineWidth = 1.5; ctx.beginPath();
       for (let i = 0, n = 5 + Math.round(13 * k); i < n; i++) { const yy = hy + ((i * 79.7) % (H - hy)), len = (40 + ((i * 37) % 90)) * (0.5 + k), xx = W - (((i * 131.3) + tt * (700 + 1500 * k)) % (W + len)); ctx.moveTo(xx, yy); ctx.lineTo(xx + len, yy); }
       ctx.stroke(); ctx.restore(); } }
-  if (COND && (COND.id === 'rain' || COND.id === 'damp')) { /* rain streaks, thin and slanted; damp gets a handful, rain a curtain */
+  if (false) { /* rain streaks, thin and slanted; damp gets a handful, rain a curtain */
     const n = COND.id === 'rain' ? 90 : 24, tR = performance.now() / 1000; ctx.strokeStyle = 'rgba(180,205,255,.35)'; ctx.lineWidth = 1; ctx.beginPath();
     for (let i = 0; i < n; i++) { const x = ((i * 97.3 + tR * 120) % (W + 40)) - 20, y = ((i * 53.7 + tR * 520) % (H + 30)) - 15; ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 12); }
     ctx.stroke();
@@ -6861,7 +6858,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v255 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v256 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) { $('tBackup').hidden = false; $('tGear').hidden = false; }
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
