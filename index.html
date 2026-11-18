@@ -823,6 +823,28 @@ body, #app { background:#08080e; }
   .sec[data-gt="shop"] .stats .more { display: block !important; margin: 2px 0 0; font-size: 10px; }
 }
 
+/* online tab */
+.olcard { padding: 12px; margin: 0 0 12px; border-radius: 12px; background: #120f22; border: 1px solid #2c2550; }
+.olh { font: 800 12px var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: #b9a8ff; margin-bottom: 8px; }
+.olrow { display: flex; gap: 8px; }
+.olin { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #3a3366; background: #0a0816; color: #fff; font: 700 15px var(--f-mono); }
+.olbtn { min-height: 44px; padding: 0 16px; border-radius: 8px; border: 0; background: linear-gradient(180deg, #ff4fa3, #c8257a); color: #fff; font: 800 13px var(--f-body); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.olbtn.sm { min-height: 36px; padding: 0 12px; font-size: 12px; background: #2a2450; margin: 6px 0; }
+.olbtn:disabled { opacity: .5; }
+.olnote { margin: 6px 0 10px; font: 600 12px/1.45 var(--f-mono); color: #a99fc8; }
+.olsec { margin: 16px 0 8px; font: 800 13px var(--f-body); color: #e8e2ff; letter-spacing: .04em; }
+.olghost { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin: 0 0 8px; border-radius: 10px; background: #15112a; border: 1px solid #2c2550; }
+.olghost .gl { flex: 1; min-width: 0; }
+.olghost .gn { font: 800 15px var(--f-body); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.olghost .gc { font: 600 12px var(--f-mono); color: #b9a8ff; }
+.olghost .gt { font: 700 12px var(--f-mono); color: #37f08a; margin-top: 2px; }
+.ollb { list-style: none; margin: 0 0 8px; padding: 0; }
+.ollb li { display: grid; grid-template-columns: 34px 1fr auto; grid-template-areas: "r n t" "r c t"; gap: 0 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #241f40; font: 600 12px var(--f-mono); color: #d8d0f0; }
+.ollb li.me { background: rgba(255,79,163,.12); border-radius: 8px; }
+.ollb .r { grid-area: r; font-weight: 900; color: #f2b705; }
+.ollb .n { grid-area: n; font: 800 14px var(--f-body); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ollb .c { grid-area: c; color: #a99fc8; }
+.ollb .t { grid-area: t; font-weight: 800; color: #37f08a; }
 /* chop shop — the Black Market as a back-alley shop with a service desk */
 .bmcard.chop { padding: 0; overflow: hidden; border: 2px solid #1d1a22; border-radius: 10px; background: #141218 repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 6px); box-shadow: 0 0 0 1px #3a3340, 0 8px 24px rgba(0,0,0,.5); }
 .chop .haz { height: 8px; background: repeating-linear-gradient(135deg, #f2b705 0 10px, #16131a 10px 20px); }
@@ -1116,6 +1138,7 @@ body.burning .dock .inner { grid-template-columns: 1.15fr .85fr 1.15fr; }
     <section class="sec" data-gt="race"><h2>Pick your rival</h2><div class="rivals" id="rivalList"></div></section>
     <section class="sec" data-gt="events"><h2>Events</h2><div class="stat-line" id="dailyCard"></div><div class="stat-line" id="amCard"></div>
       <p class="note">New challenges every day. Beat more rivals to unlock more events.</p></section>
+    <section class="sec" data-gt="online" id="onlineSec"><h2>Online</h2><p class="lede">Race the ghosts of real players: their actual runs, replayed in lane 2.</p><div id="onlineList"></div></section>
     <section class="sec" data-gt="owned"><h2>My garage</h2><div class="ups" id="ownList"></div>
       <p class="note">Each car keeps its own parts, tune and paint. Sell a car from its card to free a slot.</p>
     </section>
@@ -1996,6 +2019,34 @@ class Racer {
         if (m === 1320) { this.finished = true; this.finishClock = tc; }
       }
     }
+    if (this.trace && !this.trDone) this.recTrace();
+  }
+  /* 30 samples a second of the run, for ghost races: [time, x, v, rpm, gear, nitrous, wheelspin] */
+  recTrace() {
+    const T = this.trace;
+    if (this.tl + 1e-9 >= (this.trN || 0) || (this.finished && !this.trF)) {
+      if (this.tl + 1e-9 >= (this.trN || 0)) this.trN = (this.trN || 0) + 1 / 30;
+      if (this.finished) this.trF = 1;
+      T.push([+this.tl.toFixed(4), +this.x.toFixed(3), +this.v.toFixed(3), Math.round(this.rpm), this.gear, this.nos > 0 ? 1 : 0, this.spin ? 1 : 0]);
+    }
+    if ((this.finished && this.tl - this.finishClock > 1) || T.length > 2400) this.trDone = true;
+  }
+}
+/* lane 2 replays a recorded run instead of simulating one; timing marks and the finish come straight from the recording */
+class GhostRacer extends Racer {
+  constructor(o, g) { super(o); this.g = g; this.gi = 0; }
+  step(dt) {
+    if (this.mode !== 'run') return;
+    this.tl += dt; this.clock += dt; if (this.flame > 0) this.flame -= dt;
+    const T = this.g.tr, n = T.length; let i = this.gi;
+    while (i < n - 1 && T[i + 1][0] <= this.tl) i++;
+    this.gi = i; const a = T[i];
+    if (i < n - 1 && this.tl >= a[0]) { const b = T[i + 1], f = Math.max(0, Math.min(1, (this.tl - a[0]) / Math.max(1e-6, b[0] - a[0]))); this.x = a[1] + (b[1] - a[1]) * f; this.v = a[2] + (b[2] - a[2]) * f; this.rpm = a[3] + (b[3] - a[3]) * f; }
+    else if (i >= n - 1) { this.v = Math.max(0, this.v - 7.5 * dt); this.x = Math.max(this.x, a[1]) + this.v * dt; this.rpm = Math.max(1100, this.rpm - 3000 * dt); }
+    if (a[4] > this.gear) this.flame = 0.25;
+    this.gear = a[4]; this.nos = a[5] ? 1 : 0; this.spin = !!a[6];
+    for (const m of MARKS) if (!this.marks[m] && this.g.mk[m] && this.x >= m * FT) { this.marks[m] = { t: this.g.mk[m][0], v: this.g.mk[m][1] }; if (m === 1320) { this.finished = true; this.finishClock = this.g.fc; } }
+    if (!this.finished && i >= n - 1) { this.finished = true; this.finishClock = this.g.fc; if (!this.marks[1320]) this.marks[1320] = { t: this.g.mk[1320][0], v: this.g.mk[1320][1] }; }
   }
 }
 // ==SIM-END==
@@ -2492,6 +2543,8 @@ function newRace() {
   if (MU.kind === 'hcp') opp.rt = Math.max(-1.35, opp.rt + MU.off);
   opp.power *= 1 + (Math.random() - 0.5) * 0.024; if (Math.random() < 0.06) opp.rt += 0.06 + Math.random() * 0.08; /* rivals are not robots: a touch of power variance, and now and then a lazy launch */
   opp.target = opp.idealRpm() + (Math.random() - 0.5) * 2 * r.acc; lcAdj = 1; goArmed = false;
+  player.trace = [];
+  if (GHOST) opp = ghostRacer(GHOST);
   particles.length = 0;
   raceT = 0; finT = 0;
 }
@@ -3488,7 +3541,7 @@ function startRaceNow() {
   audioStart(); AU.purged = false; AU.stage = 0; sfxStart();
   newRace();
   { const nn = AMS() ? 'none' : ''; $('btnNos').style.display = nn; $('btnScr').style.display = nn; }
-  { const rd = (rivalTrim(RIVALS[save.rival]) || {}).dr || 'r'; opp._dr = rd; opp.boDelay = 0.25 + Math.random() * 0.5; opp.boDur = rd === 'a' ? 1.2 : 1.8 + Math.random() * 1.1; opp.boT = 0; opp._bo = false; }
+  { const rd = GHOST ? GHOST.look.dr : (rivalTrim(RIVALS[save.rival]) || {}).dr || 'r'; opp._dr = rd; opp.boDelay = 0.25 + Math.random() * 0.5; opp.boDur = rd === 'a' ? 1.2 : 1.8 + Math.random() * 1.1; opp.boT = 0; opp._bo = false; }
   phase = 'burnout'; phaseT = 0;
   $('garage').hidden = true; $('slipSheet').hidden = true;
   setGo('Launch', 'hold, release on green'); goArmed = false; $('btnGo').classList.remove('on');
@@ -3532,7 +3585,7 @@ function enterStage() {
 function showGarage() {
   const wasPhase = phase; syncWear(); burnUI(false); /* ads only ever show after a finished race, never when the garage is opened mid-race */
   if (replay) stopReplay();
-  phase = 'garage'; coachOff(); newRace(); setGas(false); goArmed = false; $('btnGo').classList.remove('on');
+  phase = 'garage'; coachOff(); GHOST = null; newRace(); setGas(false); goArmed = false; $('btnGo').classList.remove('on');
   $('garage').hidden = false; renderGarage(); $('slipSheet').hidden = true; setHint(''); if (wasPhase === 'done') maybeInterstitial();
   if (PEND_UNL) { const L = PEND_UNL; PEND_UNL = null; setTimeout(() => { if (!$('garage').hidden) unlockReveal(L); }, 500); }
 }
@@ -3735,6 +3788,7 @@ function confetti() {
     if (t < 2.1) requestAnimationFrame(f); else c.remove(); })(t0);
 }
 function endRace(wasFoul) {
+  if (GHOST) { ghostEnd(wasFoul); return; }
   syncWear(); burnUI(false); phase = 'done'; setGas(false); setHint(''); setTimeout(sfxShutdown, 900); if (tutOn() && !wasFoul) { save.seen.tut = 1; persist(); } coachOff(); coachKey = '';
   const rv = RIVALS[save.rival], rvIdx = save.rival, mu = MU || { kind: 'even', off: 0 };
   let slipRes = null, wearTot = 0, wearAdd = 0, firstWin = false, win = false, margin = 0, prize = 0, newBest = false, unlockedNext = null, unlockList = [], pET = null, rivBest = false, starBonus = 0, starNew = [], dailyBonus = 0, gateNote = false, condBonus = 0, chDone = [], chBonus = 0, amBonus = 0, amNote = '';
@@ -3828,6 +3882,7 @@ function endRace(wasFoul) {
   renderAdRow({ prize: wasFoul ? 0 : prize, dead: !wasFoul && !!player.blown, eng: save.eng, gate: gateNote });
   $('btnReplay').hidden = wasFoul || rec.length < 8;
   $('slipSheet').hidden = false; $('slipSheet').scrollTop = 0;
+  try { olAfterRace(wasFoul); } catch (_) {}
   if (!wasFoul && !(player && player.blown)) afterScene(win, firstWin, rvIdx);
   { const fo = { win, foul: wasFoul, dead: !wasFoul && !!player.blown, margin, prize: wasFoul ? 0 : prize, rv }; let tries = 0;
     const go = () => { try { if (!$('story').hidden && tries++ < 400) { setTimeout(go, 150); return; } if (!$('slipSheet').hidden) { resultFx(fo); if (unlockList.length) setTimeout(() => { const L = unlockList.slice(); if (!$('slipSheet').hidden || (phase === 'garage' && !$('garage').hidden)) unlockReveal(L); else PEND_UNL = L; }, FX_CALM ? 900 : 3300); } } catch (e) {} }; setTimeout(go, 60); } /* wait for any story scene to close first */
@@ -3843,7 +3898,7 @@ const GICON = {
 };
 /* four main sections; every old garage tab is now a sub-tab (a "leaf") so gTab and goTab() keep their old meaning */
 const GGROUPS = [
-  { id: 'race', label: 'Race', leaves: [['race', 'Rivals'], ['events', 'Events'], ['career', 'Career']] },
+  { id: 'race', label: 'Race', leaves: [['race', 'Rivals'], ['events', 'Events'], ['online', 'Online'], ['career', 'Career']] },
   { id: 'garage', label: 'Garage', leaves: [['owned', 'My cars']] },
   { id: 'build', label: 'Build', leaves: [['shop', 'Upgrades'], ['engines', 'Engine'], ['dyno', 'Dyno'], ['looks', 'Paint']] },
   { id: 'market', label: 'Market', leaves: [['cars', 'Dealership'], ['market', 'Black Market'], ['store', 'Store']] }
@@ -3959,7 +4014,7 @@ function renderGarage() {
   PD = playerDesc();
   const MUS = RIVALS.map((r, i) => matchup(PD, i)), okAt = i => unlocked(i) && MUS[i].kind !== 'out';
   if (!okAt(save.rival)) { let best = -1, bd = 1e9; RIVALS.forEach((r, i) => { if (i < NREAL && okAt(i) && Math.abs(PD.et - r.est) < bd) { bd = Math.abs(PD.et - r.est); best = i; } }); if (best >= 0) { save.rival = best; persist(); } }
-  renderClass(); renderDaily(); renderAM(); renderStore();
+  renderClass(); renderDaily(); renderAM(); renderStore(); try { renderOnline(); } catch (_) {}
   $('cash').textContent = money(save.cash);
   const L = $('rivalList'); L.textContent = '';
   { const b = document.createElement('button'), R = RIVALS[NREAL], on = isStreet(); b.type = 'button'; b.className = 'rival street' + (on ? ' sel' : ''); b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -4601,6 +4656,225 @@ function chopScene(cv) {
   paint();
   return { setCar(c) { st.car = c; st.base = null; paint(); } };
 }
+/* ---------- online: ghost races ----------
+   Every clean run records the car's position 30 times a second. Your best run in each race class is your ghost: it stays on this phone,
+   and when online is set up it also uploads to Firebase so other players can race it. Racing a ghost replays that real run in lane 2.
+   Firebase is reached through its REST API (no SDK). Fill in FIREBASE_CFG after creating the Firebase project; until then the Online
+   tab still lets you race your own ghosts. */
+const FIREBASE_CFG = { apiKey: '', projectId: '' };
+const OL_ON = () => !!(FIREBASE_CFG.apiKey && FIREBASE_CFG.projectId);
+const GHOST_V = 1;
+let GHOST = null;
+const OL = { auth: null, list: null, cls: '', err: '', busy: false, at: 0 };
+const OL_KEY = 'stripnight.ol';
+const olLoad = () => { try { return JSON.parse(localStorage.getItem(OL_KEY) || 'null'); } catch (_) { return null; } };
+const olSave = a => { try { localStorage.setItem(OL_KEY, JSON.stringify(a)); } catch (_) {} };
+const olName = () => (save.ol && save.ol.name) || '';
+const cleanName = s => String(s || '').replace(/[^A-Za-z0-9 _-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+const HEX = /^#[0-9a-fA-F]{6}$/, RGB = /^\d{1,3},\d{1,3},\d{1,3}$/;
+function cleanLook(L) {
+  L = L && typeof L === 'object' ? L : {};
+  const num = (v, a, b, d) => typeof v === 'number' && isFinite(v) ? Math.max(a, Math.min(b, v)) : d;
+  const car = CARS.find(c => c.id === L.car) ? L.car : CARS[0].id;
+  let tint = null;
+  if (L.tint && typeof L.tint === 'object') { tint = {}; ['h', 's', 'lm', 'lo', 'g', 'gl', 'pl', 'gx', 'cm'].forEach(k => { if (typeof L.tint[k] === 'number' && isFinite(L.tint[k])) tint[k] = L.tint[k]; }); tint.k = String(L.tint.k || '').replace(/[^\w.]/g, '').slice(0, 24) || 'x'; }
+  const gt = L.gt && typeof L.gt === 'object' && PHOTOS[L.gt.key] ? { key: L.gt.key, lv: num(L.gt.lv, 1, 5, 1) } : null;
+  return {
+    car, paint: HEX.test(L.paint) ? L.paint : '#a8aab4', stripe: HEX.test(L.stripe) ? L.stripe : null,
+    glow: typeof L.glow === 'string' && (HEX.test(L.glow) || RGB.test(L.glow)) ? L.glow : null,
+    roof: num(L.roof, 0.5, 1.2, 1), wheels: Math.round(num(L.wheels, 0, 40, 0)), tint, rh: num(L.rh, -1, 1, 0),
+    wp: Math.round(num(L.wp, -1, WHEELP.length - 1, -1)), ws: num(L.ws, 0.5, 1.5, 0.9), dr: ['r', 'f', 'a'].includes(L.dr) ? L.dr : 'r',
+    cc: HEX.test(L.cc) ? L.cc : CALIPER_COLORS[0][1], gt
+  };
+}
+/* a ghost is { v, name, cls, et, mph, rt, fc, lr, eng, voice, snd, nos, tr: [[t, x, v, rpm, gear, nos, spin]...], mk: {60: [t, mph]...}, look } */
+function cleanGhost(g) {
+  if (!g || typeof g !== 'object') return null;
+  const n = v => typeof v === 'number' && isFinite(v);
+  if (!Array.isArray(g.tr) || g.tr.length < 20 || g.tr.length > 3000 || !n(g.et) || g.et < 3 || g.et > 40 || !n(g.fc) || !n(g.rt)) return null;
+  for (const s of g.tr) if (!Array.isArray(s) || s.length < 5 || !s.slice(0, 5).every(n)) return null;
+  const mk = {}; for (const m of MARKS) { const a = g.mk && g.mk[m]; if (Array.isArray(a) && n(a[0]) && n(a[1])) mk[m] = [a[0], a[1]]; }
+  if (!mk[1320]) return null;
+  const voice = typeof g.voice === 'string' && VOICE[g.voice] ? g.voice : 'v8';
+  const snd = g.snd && typeof g.snd === 'object' ? { cam: +g.snd.cam || 0, hdr: +g.snd.hdr || 0, exh: +g.snd.exh || 0 } : { cam: 0, hdr: 0, exh: 0 };
+  return { v: GHOST_V, uid: String(g.uid || '').slice(0, 64), name: cleanName(g.name) || 'Racer', cls: String(g.cls || '').slice(0, 8), et: g.et, mph: n(g.mph) ? g.mph : 0, rt: Math.max(0, Math.min(1, g.rt)), fc: g.fc, lr: n(g.lr) ? g.lr : 4000, eng: String(g.eng || ''), voice, snd, nos: !!g.nos, tr: g.tr, mk, look: cleanLook(g.look), carName: String(g.carName || '').slice(0, 40), me: !!g.me };
+}
+/* the player's finished run as a ghost */
+function ghostFromPlayer() {
+  const p = player; if (!p || !p.trace || !p.marks[1320] || p.blown) return null;
+  const c = curCar(), mk = {}; for (const m of MARKS) if (p.marks[m]) mk[m] = [+p.marks[m].t.toFixed(4), +p.marks[m].v.toFixed(2)];
+  const look = { car: save.car, paint: save.paint, stripe: save.stripe, glow: save.glow, roof: BODIES[save.body] ? BODIES[save.body].roof : 1, wheels: save.wheels,
+    tint: tintSpec(save.car), rh: rhOf(save.car), wp: wheelP(save.car), ws: wheelSz(save.car), dr: DRV(c.drive), cc: calOf(save.car), gt: gtOf(save.car) };
+  return cleanGhost({ name: olName() || 'You', cls: PD && PD.cls ? PD.cls.id : '', et: p.marks[1320].t, mph: p.marks[1320].v, rt: p.t0, fc: p.finishClock, lr: p.launchRpm || 4000,
+    eng: p.eng.id, voice: p.eng.voice || p.eng.id, snd: p.eng.snd, nos: p.nosLeft < p.nosShots, tr: p.trace, mk, look, carName: c.name, me: true });
+}
+function ghostTrim() {
+  if (GHOST._tr) return GHOST._tr;
+  const L = GHOST.look, c = CARS.find(x => x.id === L.car) || CARS[0];
+  return GHOST._tr = Object.assign({}, c.trim, { tint: L.tint, brush: null, rh: L.rh, wp: L.wp, dr: L.dr, ws: L.ws, cc: L.cc, gt: L.gt });
+}
+function drawOpp(o, base) {
+  if (GHOST) { const L = GHOST.look; drawCar(o, base, 0.88, L.paint, L.roof, L.glow, L.stripe, L.wheels, ghostTrim()); return; }
+  const rvl = RIVALS[save.rival]; drawCar(o, base, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl));
+}
+/* keep your best run per class on this phone; upload it when online is on */
+function olAfterRace(wasFoul) {
+  if (wasFoul || !player || player.blown) return;
+  const g = ghostFromPlayer(); if (!g || !g.cls) return;
+  if (!save.ghosts) save.ghosts = {};
+  const old = save.ghosts[g.cls];
+  if (old && old.et <= g.et) return;
+  save.ghosts[g.cls] = g; persist();
+  if (OL_ON() && olName()) olUpload(g).catch(() => {});
+}
+function ghostRacer(g) {
+  const o = new GhostRacer({ cond: COND, power: 1, mu: 1, auto: true, eng: ENGINES.find(e => e.id === g.eng) || ENGINES[0] }, g);
+  o.sv = g.voice; o.sndm = g.snd; o.nosAud = g.nos; o.rt = g.rt; o.target = g.lr; return o;
+}
+function raceGhost(g) { GHOST = g; startRaceNow(); }
+
+/* ---- Firebase REST ---- */
+async function olAuth() {
+  const k = FIREBASE_CFG.apiKey; let a = OL.auth || olLoad();
+  if (a && a.idToken && a.exp > Date.now() + 60000) return OL.auth = a;
+  if (a && a.refreshToken) {
+    const r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + encodeURIComponent(k), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(a.refreshToken) });
+    if (r.ok) { const j = await r.json(); a = { uid: j.user_id, idToken: j.id_token, refreshToken: j.refresh_token, exp: Date.now() + (+j.expires_in || 3600) * 1000 }; olSave(a); return OL.auth = a; }
+  }
+  const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(k), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
+  if (!r.ok) throw new Error('sign-in ' + r.status);
+  const j = await r.json(); a = { uid: j.localId, idToken: j.idToken, refreshToken: j.refreshToken, exp: Date.now() + (+j.expiresIn || 3600) * 1000 }; olSave(a); return OL.auth = a;
+}
+const fsBase = () => 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(FIREBASE_CFG.projectId) + '/databases/(default)/documents';
+const fsCol = cls => 'ghosts_' + String(cls).replace(/[^a-z0-9]/gi, '');
+async function olUpload(g) {
+  const a = await olAuth();
+  const doc = { v: GHOST_V, name: olName(), cls: g.cls, et: g.et, mph: g.mph, rt: g.rt, fc: g.fc, lr: g.lr, eng: g.eng, voice: g.voice, snd: g.snd, nos: g.nos, carName: g.carName, look: g.look, mk: g.mk };
+  const fields = {
+    name: { stringValue: doc.name }, et: { doubleValue: g.et }, mph: { doubleValue: g.mph }, carName: { stringValue: g.carName },
+    data: { stringValue: JSON.stringify(doc) }, tr: { stringValue: JSON.stringify(g.tr) }, at: { timestampValue: new Date().toISOString() }
+  };
+  const r = await fetch(fsBase() + '/' + fsCol(g.cls) + '/' + encodeURIComponent(a.uid), { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.idToken }, body: JSON.stringify({ fields }) });
+  if (!r.ok) throw new Error('upload ' + r.status);
+  if (!save.ol) save.ol = {}; save.ol.up = save.ol.up || {}; save.ol.up[g.cls] = g.et; persist();
+}
+async function olFetch(cls) {
+  const a = await olAuth();
+  const body = { structuredQuery: { from: [{ collectionId: fsCol(cls) }], orderBy: [{ field: { fieldPath: 'et' }, direction: 'ASCENDING' }], limit: 60 } };
+  const r = await fetch(fsBase() + ':runQuery', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.idToken }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('load ' + r.status);
+  const rows = await r.json(), out = [];
+  for (const row of rows) {
+    const d = row && row.document; if (!d || !d.fields) continue;
+    try { const meta = JSON.parse(d.fields.data.stringValue), tr = JSON.parse(d.fields.tr.stringValue), uid = d.name.split('/').pop();
+      const g = cleanGhost(Object.assign(meta, { tr, uid, cls })); if (g) { g.me = uid === a.uid; out.push(g); } } catch (_) {}
+  }
+  return out;
+}
+function olRefresh(force) {
+  const cls = PD && PD.cls ? PD.cls.id : '';
+  if (!OL_ON() || OL.busy || (!force && OL.cls === cls && Date.now() - OL.at < 60000)) return;
+  OL.busy = true; OL.err = ''; OL.cls = cls;
+  olFetch(cls).then(l => { OL.list = l; OL.at = Date.now(); }).catch(e => { OL.err = navigator.onLine === false ? 'You are offline.' : 'Could not reach the online server. Try again in a bit.'; OL.list = OL.list || null; })
+    .finally(() => { OL.busy = false; if (gTab === 'online' && !$('garage').hidden) renderOnline(); });
+}
+
+/* ---- Online tab ---- */
+function renderOnline() {
+  const U = $('onlineList'); if (!U) return; U.textContent = '';
+  const cls = PD && PD.cls ? PD.cls.id : '', C = CLS_BY[cls] || { name: cls, col: '#fff' };
+  /* racer name */
+  const nb = mk('div', 'olcard'); nb.appendChild(mk('div', 'olh', 'Racer name'));
+  const nr = mk('div', 'olrow'), inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 16; inp.value = olName(); inp.placeholder = '3 to 16 letters or numbers'; inp.setAttribute('aria-label', 'Racer name'); inp.className = 'olin';
+  const sv = mk('button', 'olbtn', olName() ? 'Save' : 'Set name'); sv.type = 'button';
+  const msg = mk('div', 'olnote', olName() ? 'Other players see this name on your ghost.' : 'Pick a name so other players can race your ghost.');
+  sv.onclick = () => { const v = cleanName(inp.value); if (v.length < 3) { msg.textContent = 'Use 3 to 16 letters, numbers, spaces, - or _.'; return; } if (!save.ol) save.ol = {}; const ch = v !== save.ol.name; save.ol.name = v; persist(); msg.textContent = 'Saved.';
+    if (ch && OL_ON() && save.ghosts) Object.values(save.ghosts).forEach(g => olUpload(g).catch(() => {})); };
+  nr.appendChild(inp); nr.appendChild(sv); nb.appendChild(nr); nb.appendChild(msg); U.appendChild(nb);
+  /* your own ghost in this class */
+  const head = mk('h3', 'olsec'); head.appendChild(document.createTextNode('Your class: ')); const cb = mk('b', null, C.name); cb.style.color = C.col; head.appendChild(cb); U.appendChild(head);
+  const mine = save.ghosts && save.ghosts[cls] ? cleanGhost(save.ghosts[cls]) : null;
+  if (mine) { mine.name = 'Your best'; mine.me = true; U.appendChild(ghostRow(mine, 'Race your best run')); }
+  else U.appendChild(mk('div', 'olnote', 'Finish a clean race in this class and your best run becomes your ghost.'));
+  /* other players */
+  U.appendChild(mk('h3', 'olsec', 'Ghosts near your time'));
+  if (!OL_ON()) { U.appendChild(mk('div', 'olnote', 'Online races are not switched on in this version yet. Your best runs are saved and will upload when they are.')); return; }
+  if (!olName()) { U.appendChild(mk('div', 'olnote', 'Set a racer name to race other players.')); return; }
+  if (OL.cls !== cls || (!OL.list && !OL.busy && !OL.err)) olRefresh(true);
+  if (OL.busy && !OL.list) { U.appendChild(mk('div', 'olnote', 'Loading ghosts…')); return; }
+  if (OL.err) { const e = mk('div', 'olnote', OL.err + ' '); const rb = mk('button', 'olbtn sm', 'Retry'); rb.type = 'button'; rb.onclick = () => { OL.err = ''; olRefresh(true); renderOnline(); }; e.appendChild(rb); U.appendChild(e); }
+  const all = (OL.list || []).filter(g => g.cls === cls), others = all.filter(g => !g.me);
+  if (!others.length) U.appendChild(mk('div', 'olnote', 'No other ghosts in this class yet. Yours will be the first.'));
+  const est = PD ? PD.et : 12;
+  others.slice().sort((a, b) => Math.abs(a.et - est) - Math.abs(b.et - est)).slice(0, 8).sort((a, b) => a.et - b.et).forEach(g => U.appendChild(ghostRow(g, 'Race')));
+  /* leaderboard */
+  if (all.length) {
+    U.appendChild(mk('h3', 'olsec', 'Leaderboard · ' + C.name));
+    const lb = mk('ol', 'ollb'); all.slice(0, 10).forEach((g, i) => { const li = mk('li', g.me ? 'me' : ''); li.appendChild(mk('span', 'r', '#' + (i + 1))); li.appendChild(mk('span', 'n', g.me ? g.name + ' (you)' : g.name)); li.appendChild(mk('span', 'c', g.carName)); li.appendChild(mk('span', 't', g.et.toFixed(3) + ' s')); lb.appendChild(li); });
+    U.appendChild(lb);
+  }
+  const rf = mk('button', 'olbtn sm', OL.busy ? 'Refreshing…' : 'Refresh'); rf.type = 'button'; rf.disabled = OL.busy; rf.onclick = () => { olRefresh(true); renderOnline(); }; U.appendChild(rf);
+  U.appendChild(mk('div', 'olnote', 'Your best clean run in each class uploads as your ghost. Ghost wins pay $200 and losses $40, for your first 10 online races each day.'));
+}
+function ghostRow(g, label) {
+  const r = mk('div', 'olghost'), L = mk('div', 'gl');
+  L.appendChild(mk('div', 'gn', g.name)); L.appendChild(mk('div', 'gc', g.carName || ''));
+  L.appendChild(mk('div', 'gt', g.et.toFixed(3) + ' s · ' + Math.round(g.mph) + ' mph · R/T ' + g.rt.toFixed(3)));
+  r.appendChild(L); const b = mk('button', 'olbtn', label); b.type = 'button'; b.onclick = () => raceGhost(g); r.appendChild(b); return r;
+}
+/* results for a ghost race */
+function ghostEnd(wasFoul) {
+  syncWear(); burnUI(false); phase = 'done'; setGas(false); setHint(''); setTimeout(sfxShutdown, 900); coachOff(); coachKey = '';
+  const G = GHOST; let win = false, margin = 0, prize = 0, pET = null, newBest = false, capped = false;
+  if (!wasFoul) {
+    const dead = !!player.blown;
+    recordTail(dead);
+    if (!dead) fastForward(player); fastForward(opp);
+    const pT = dead ? Infinity : player.t0 + player.finishClock, oT = opp.t0 + opp.finishClock;
+    setTimeout(() => sfxResult(pT < oT), 0);
+    if (dead) { save.dmg[save.eng] = player.blown; save.cars[save.car] = pickBuild(); }
+    win = pT < oT; margin = dead ? 0 : Math.abs(pT - oT);
+    pET = player.marks[1320] ? player.marks[1320].t : null;
+    if (pET !== null && (save.best === null || pET < save.best)) { save.best = pET; newBest = true; }
+    const day = dayKey(); if (!save.olDay || save.olDay.d !== day) save.olDay = { d: day, n: 0 };
+    if (save.olDay.n < 10) { prize = win ? 200 : 40; save.olDay.n++; } else capped = true;
+    save.cash += prize; condStale = true;
+    persist(); olAfterRace(false);
+  }
+  $('cash').textContent = money(save.cash);
+  const f = wasFoul, them = G.me ? 'YOUR GHOST' : G.name.toUpperCase();
+  const rows = [
+    ['R/T', '<span>' + (f ? 'RED' : fmt(player.t0)) + '</span>', '<span>' + (f ? '---' : fmt(opp.t0)) + '</span>'],
+    ["60'", f ? '<span>---</span>' : cell(player, 60), f ? '<span>---</span>' : cell(opp, 60)],
+    ["330'", f ? '<span>---</span>' : cell(player, 330), f ? '<span>---</span>' : cell(opp, 330)],
+    ['1/8 ET', f ? '<span>---</span>' : cell(player, 660, true), f ? '<span>---</span>' : cell(opp, 660, true)],
+    ["1000'", f ? '<span>---</span>' : cell(player, 1000), f ? '<span>---</span>' : cell(opp, 1000)],
+    ['1/4 ET', f ? '<span>---</span>' : cell(player, 1320, true), f ? '<span>---</span>' : cell(opp, 1320, true)]
+  ];
+  let html = '<div class="slip-h"><b>Strip Night Dragway · Online</b><span>' + esc(new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })) + ' · vs ' + esc(G.me ? 'your ghost' : G.name) + ' · ' + esc(G.carName || '') + '</span></div>';
+  html += '<div class="sg head"><span></span><span>LANE 1<br>YOU</span><span>LANE 2<br>' + esc(them) + '</span></div>';
+  rows.forEach((r, i) => { html += '<div class="sg' + (i === 5 ? ' big' : '') + '"><span>' + r[0] + '</span>' + r[1] + r[2] + '</div>'; });
+  if (wasFoul) html += '<div class="slip-win">Red light<small>Left ' + foulBy.toFixed(3) + ' s before the green. Disqualified.</small></div>';
+  else if (player.blown) html += '<div class="slip-win">Engine failure<small>' + esc(player.blown) + ' let go. Rebuild the engine in the garage.</small></div>';
+  else html += '<div class="slip-win">Winner: Lane ' + (win ? '1 (you)' : '2 (' + esc(G.me ? 'your ghost' : G.name) + ')') + '<small>by ' + margin.toFixed(3) + ' s</small></div>';
+  $('slip').innerHTML = html;
+  let pay = '';
+  if (wasFoul) pay = '<span>No prize for a red light.</span>';
+  else {
+    pay += '<span>' + (win ? 'Online win' : 'Online race') + ' <b>+' + money(prize) + '</b></span>';
+    if (capped) pay += '<span>Online payouts <em>used up for today</em></span>';
+    if (player.grade) pay += '<span>Launch <em>' + player.grade + '</em></span>';
+    if (newBest) pay += '<span>New best <em>' + fmt(save.best, 3) + ' s</em></span>';
+    const g = save.ghosts && PD && save.ghosts[PD.cls.id];
+    if (g && pET !== null && Math.abs(g.et - pET) < 1e-6) pay += '<span>New ghost <em>' + (OL_ON() && olName() ? 'uploaded for other players' : 'saved on this phone') + '</em></span>';
+  }
+  $('pay').innerHTML = pay;
+  renderAdRow({ prize: wasFoul ? 0 : prize, dead: !wasFoul && !!player.blown, eng: save.eng, gate: false });
+  $('btnReplay').hidden = wasFoul || rec.length < 8;
+  $('slipSheet').hidden = false; $('slipSheet').scrollTop = 0;
+  try { resultFx({ win, foul: wasFoul, dead: !wasFoul && !!player.blown, margin, prize: wasFoul ? 0 : prize, rv: { name: G.me ? 'your ghost' : G.name } }); } catch (_) {}
+}
+
 function renderBlack(U) {
   const day = dayKey(); if (!save.bm || save.bm.d !== day) save.bm = { d: day, bought: [] };
   const bm = save.bm, bmD = challengesToday().all ? 0.8 : 1; let h = 11; for (let c = 0; c < day.length; c++) h = (h * 31 + day.charCodeAt(c)) >>> 0;
@@ -5775,12 +6049,11 @@ function draw() {
   ctx.fillStyle = '#b6add9'; ctx.fillRect(0, nearBot, W, 1);
 
   // cars
-  const rvl = RIVALS[save.rival];
   const wet = !fxLow() && !replay;
   if (wet) { /* neon sheen on wet asphalt: a faint mirrored car under each lane */
     ctx.save(); ctx.beginPath(); ctx.rect(0, farBase, W, farBot - farBase + 2); ctx.clip(); ctx.translate(0, farBase * 2); ctx.scale(1, -1); ctx.globalAlpha = 0.16;
-    drawCar(o, farBase, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl)); ctx.restore(); }
-  drawCar(o, farBase, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl));
+    drawOpp(o, farBase); ctx.restore(); }
+  drawOpp(o, farBase);
   for (const pt of particles) if (pt.r === 1) puff(pt, farBase, 0.88, sx);
   curCar().trim.tint = tintSpec(save.car); curCar().trim.brush = brushOf(save.car); curCar().trim.rh = rhOf(save.car); curCar().trim.wp = wheelP(save.car); curCar().trim.dr = DRV(curCar().drive); curCar().trim.ws = wheelSz(save.car); curCar().trim.cc = calOf(save.car); curCar().trim.gt = gtOf(save.car);
   if (wet) { ctx.save(); ctx.beginPath(); ctx.rect(0, nearBase, W, curbBot - nearBase); ctx.clip(); ctx.translate(0, nearBase * 2); ctx.scale(1, -1); ctx.globalAlpha = 0.2;
@@ -5818,7 +6091,7 @@ function drawHud(p, o) {
   const bx = pad, bw = W - pad - padr, by = 12;
   ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(bx, by, bw, 3);
   const pp = Math.min(1, Math.max(0, p.x / QM)), op = Math.min(1, Math.max(0, o.x / QM));
-  ctx.fillStyle = RIVALS[save.rival].color; ctx.beginPath(); ctx.arc(bx + bw * op, by + 1.5, 5, 0, 7); ctx.fill();
+  ctx.fillStyle = GHOST ? GHOST.look.paint : RIVALS[save.rival].color; ctx.beginPath(); ctx.arc(bx + bw * op, by + 1.5, 5, 0, 7); ctx.fill();
   ctx.fillStyle = save.paint; ctx.beginPath(); ctx.arc(bx + bw * pp, by + 1.5, 5, 0, 7); ctx.fill();
   ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(bx + bw * pp, by + 1.5, 5, 0, 7); ctx.stroke();
 
@@ -7056,6 +7329,7 @@ function vsCard(done) {
 }
 function startRace() {
   if (ST) return;
+  if (GHOST) { startRaceNow(); return; }
   preScene(save.rival, () => vsCard(startRaceNow));
 }
 function startRace_old() {
