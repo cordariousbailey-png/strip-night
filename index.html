@@ -5164,6 +5164,62 @@ function carImg(key) {
   }
   return im.complete && im.naturalWidth ? im : null;
 }
+/* ---- big-brake look: a slotted, drilled rotor and a red caliper sit behind every aftermarket rim and grow with the rim size; a coilover peeks out of each wheel well ---- */
+const BRAKE_PX = 64;
+let ROTOR_CV = null, CALIPER_CV = null;
+function brakeSprites() {
+  if (ROTOR_CV) return;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = BRAKE_PX; return c; };
+  ROTOR_CV = mk(); CALIPER_CV = mk();
+  const rc = ROTOR_CV.getContext('2d'), cc = CALIPER_CV.getContext('2d');
+  const rd = rc.createImageData(BRAKE_PX, BRAKE_PX), cd = cc.createImageData(BRAKE_PX, BRAKE_PX);
+  const C = BRAKE_PX / 2, barrel = C * 0.62, ro = C * 0.55, hat = ro * 0.38, cal = [222, 34, 50];
+  const mix = (a, b, t) => { t = Math.max(0, Math.min(1, t)); return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t)); };
+  const put = (img, x, y, c) => { const o = (y * BRAKE_PX + x) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; };
+  for (let y = 0; y < BRAKE_PX; y++) for (let x = 0; x < BRAKE_PX; x++) {
+    const dx = x + 0.5 - C, dy = y + 0.5 - C, d = Math.hypot(dx, dy), ang = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+    const light = Math.max(0, (-dx * 0.6 - dy * 0.8) / Math.max(d, 0.01));
+    if (d <= barrel) {
+      let c = [24, 24, 30];
+      if (d <= ro) {
+        if (d > ro - 1.6) c = [58, 60, 66];
+        else if (d > hat + 1.4) {
+          c = mix([92, 95, 102], [138, 141, 148], light);
+          for (let k = 0; k < 6; k++) { const a0 = k * 60 + (d - hat) * 4.5; if (Math.abs(((ang - a0 + 540) % 360) - 180) < 3.2 && d > hat + 3.5) c = [66, 68, 74]; }
+          for (let k = 0; k < 12; k++) { const a = (k * 30 + 15) * Math.PI / 180; if (Math.hypot(x + 0.5 - (C + Math.cos(a) * ro * 0.72), y + 0.5 - (C + Math.sin(a) * ro * 0.72)) < 1.3) c = [36, 36, 42]; }
+        } else if (d > hat) c = [44, 45, 52];
+        else c = mix([70, 72, 80], [104, 106, 114], light);
+      }
+      put(rd, x, y, c);
+    }
+    /* caliper: top of the rotor toward the back of the car (the cars face right) */
+    if (ang >= 192 && ang <= 256 && d > ro * 0.42 && d <= ro + 2.4) {
+      const edge = d > ro + 1.1 || d < ro * 0.42 + 1.6 || ang < 196 || ang > 252;
+      let c = edge ? [110, 10, 22] : mix(cal, [255, 130, 130], (light - 0.35) * 1.4);
+      if (!edge && ang >= 212 && ang <= 236 && Math.abs(d - ro * 0.8) < 1) c = [255, 236, 236];
+      put(cd, x, y, c);
+    }
+  }
+  rc.putImageData(rd, 0, 0); cc.putImageData(cd, 0, 0);
+}
+/* the rotor turns with the wheel; the caliper stays put. D is the drawn wheel size, so the brakes scale with the rim size slider */
+function drawBrakes(cx, cy, D, va) {
+  brakeSprites();
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(va); ctx.drawImage(ROTOR_CV, -D / 2, -D / 2, D, D); ctx.restore();
+  ctx.drawImage(CALIPER_CV, cx - D / 2, cy - D / 2, D, D);
+}
+/* coilover from the hub up into the fender; drawn before the body so the fender covers all but the gap above the tire */
+function drawCoilover(cx, cy, R) {
+  const tx = cx - 0.32 * R, ty = cy - 1.3 * R, bx = cx - 0.04 * R, by = cy - 0.12 * R;
+  ctx.save(); ctx.lineCap = 'butt';
+  ctx.strokeStyle = '#202026'; ctx.lineWidth = Math.max(2, 0.16 * R); ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty); ctx.stroke();
+  const n = 8, sw = 0.2 * R; ctx.lineWidth = Math.max(1.5, 0.07 * R);
+  for (let k = 0; k < n; k++) {
+    const t = 0.18 + k * 0.085, x = bx + (tx - bx) * t, y = by + (ty - by) * t;
+    ctx.strokeStyle = k % 2 ? '#c81e2a' : '#f04650'; ctx.beginPath(); ctx.moveTo(x - sw, y + sw * 0.3); ctx.lineTo(x + sw, y - sw * 0.3); ctx.stroke();
+  }
+  ctx.restore();
+}
 function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt) {
   const ih = L * ph.ar, nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height, lift = ph.ex * L;
   // wheel spin: cap the visible rotation speed and blur beyond it, so fast wheels never strobe
@@ -5186,13 +5242,15 @@ function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt) {
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fill();
     ctx.restore();
   });
+  const WI = wp >= 0 ? wheelImg(wp) : null;
+  if (WI) ph.wh.forEach((w, i) => drawCoilover(w[0] * L, -ih + w[1] * ih, ph.tr[i] * L));
   ctx.drawImage(im, 0, -ih + (rh || 0) * ph.tr[0] * L, L, ih);
   if (gt && gt.lv > 0) { const gi = glassTintImg(gt.key, gt.lv); if (gi) ctx.drawImage(gi, 0, -ih + (rh || 0) * ph.tr[0] * L, L, ih); }
-  const WI = wp >= 0 ? wheelImg(wp) : null;
   if (WI) {
     ph.wh.forEach((w, i) => {
       const big = wp >= 16, z = ws > 0 ? ws : 0.9, cx = w[0] * L, cy = -ih + w[1] * ih - (z > 1 ? ph.tr[i] * L * (z - 1) : 0), D = ph.tr[i] * L * 2 * z * (64 / 62);
       const sweep = swOf(i), va = vaOf(i), n = sweep ? 5 : 1;
+      drawBrakes(cx, cy, D, va);
       for (let k = 0; k < n; k++) { ctx.save(); ctx.globalAlpha = 1 / (k + 1); ctx.translate(cx, cy); ctx.rotate(va - (sweep ? sweep * k / (n - 1) : 0)); ctx.drawImage(WI, -D / 2, -D / 2, D, D); ctx.restore(); }
     });
     ctx.restore(); return;
