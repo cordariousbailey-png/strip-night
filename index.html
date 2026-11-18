@@ -823,6 +823,47 @@ body, #app { background:#08080e; }
   .sec[data-gt="shop"] .stats .more { display: block !important; margin: 2px 0 0; font-size: 10px; }
 }
 
+/* chop shop — the Black Market as a back-alley shop with a service desk */
+.bmcard.chop { padding: 0; overflow: hidden; border: 2px solid #1d1a22; border-radius: 10px; background: #141218 repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 2px, transparent 2px 6px); box-shadow: 0 0 0 1px #3a3340, 0 8px 24px rgba(0,0,0,.5); }
+.chop .haz { height: 8px; background: repeating-linear-gradient(135deg, #f2b705 0 10px, #16131a 10px 20px); }
+.chop .scene { display: block; width: 100%; height: auto; aspect-ratio: 192 / 72; image-rendering: pixelated; background: #0c0b10; border-bottom: 2px solid #000; }
+.chop .inner { padding: 12px; }
+.chop .desk { position: relative; margin: 0 0 14px; padding: 12px 12px 12px 14px; border-radius: 4px; background: linear-gradient(180deg, #4a4f58 0 4px, #2b2e35 4px 100%); border: 1px solid #5d626c; box-shadow: inset 0 -3px 0 #1a1c21; }
+.chop .desk::before { content: ''; position: absolute; inset: 4px 0 0; background: repeating-linear-gradient(45deg, rgba(255,255,255,.035) 0 2px, transparent 2px 7px), repeating-linear-gradient(-45deg, rgba(255,255,255,.035) 0 2px, transparent 2px 7px); pointer-events: none; }
+.chop .desk .plate { display: inline-block; margin: 0 0 8px; padding: 3px 10px; background: #f2b705; color: #16131a; font: 900 12px var(--f-mono); letter-spacing: .18em; border-radius: 2px; box-shadow: 0 2px 0 #7a5c00; }
+.chop .desk .note { position: relative; font: 600 13px/1.45 var(--f-mono); color: #e8e2d6; }
+.chop .desk .deal { margin-top: 8px; color: #37f08a; font: 700 12px var(--f-mono); }
+.chop .bgrp { display: flex; align-items: center; gap: 8px; margin: 14px 0 8px; color: #f2b705 !important; font: 800 12px var(--f-body); letter-spacing: .14em; text-transform: uppercase; }
+.chop .bgrp::after { content: ''; flex: 1; height: 2px; background: repeating-linear-gradient(90deg, #f2b705 0 6px, transparent 6px 10px); opacity: .5; }
+.chop .tkt { position: relative; display: grid; grid-template-columns: 1fr; gap: 8px; margin: 0 0 10px; padding: 10px 12px 12px 22px; background: #efe6cf; color: #2a2230; border-radius: 3px; box-shadow: 0 2px 0 #b9ad90, 0 6px 14px rgba(0,0,0,.45); transform: rotate(-.4deg); }
+.chop .tkt:nth-child(even) { transform: rotate(.5deg); }
+.chop .tkt::before { content: ''; position: absolute; left: 10px; top: 6px; bottom: 6px; border-left: 2px dashed #b9ad90; }
+.chop .tkt::after { content: ''; position: absolute; left: -6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #141218; }
+.chop .tkt .tno { font: 700 10px var(--f-mono); letter-spacing: .12em; color: #8a7d62; }
+.chop .tkt .on { font: 800 15px var(--f-body); color: #1b1520; }
+.chop .tkt .ox { font: 600 12px var(--f-mono); color: #4b4054; }
+.chop .tkt .oq { font: 600 12px var(--f-mono); color: #4b4054; }
+.chop .tkt .oq s { color: #8a7d62; }
+.chop .tkt .oq b { color: #b3122e; font-size: 15px; }
+.chop .tkt .acts2 { display: flex; gap: 8px; flex-wrap: wrap; }
+.chop .tkt .buy { min-height: 40px; padding: 0 14px; border-radius: 4px; border: 2px solid #1b1520; background: #1b1520; color: #f2b705; font: 800 12px var(--f-body); letter-spacing: .06em; text-transform: uppercase; box-shadow: 0 3px 0 #000; }
+.bmcard.chop .tkt .buy.alt { background: transparent !important; color: #1b1520 !important; border: 2px solid #1b1520 !important; min-height: 40px; font: 800 12px var(--f-body); letter-spacing: .06em; box-shadow: none !important; text-shadow: none !important; }
+.bmcard.chop .tkt .buy { flex: 1 1 140px; }
+.chop .tkt .buy:disabled { opacity: .45; }
+.chop .stamp { position: absolute; right: 10px; top: 8px; padding: 2px 8px; border: 3px solid #c8102e; border-radius: 4px; color: #c8102e; font: 900 14px var(--f-mono); letter-spacing: .12em; transform: rotate(8deg); opacity: .85; mix-blend-mode: multiply; }
+.chop .tkt.sold .stamp { font-size: 20px; top: 50%; right: 18px; margin-top: -16px; transform: rotate(-10deg); }
+.chop .tkt.sold > :not(.stamp) { opacity: .55; }
+.chop .bay { position: relative; padding: 12px; border-radius: 4px; background: #0f0e13; border: 2px solid transparent; background-clip: padding-box; outline: 4px solid; outline-color: transparent; box-shadow: 0 0 0 4px #16131a, 0 0 0 8px rgba(242,183,5,.0); }
+.chop .bay { border-image: repeating-linear-gradient(135deg, #f2b705 0 8px, #16131a 8px 16px) 8; border-width: 6px; border-style: solid; }
+.chop .bay .bayno { position: absolute; top: 6px; right: 10px; font: 900 22px var(--f-mono); color: rgba(242,183,5,.2); letter-spacing: .1em; }
+.chop .bay .un { font: 800 16px var(--f-body); color: #fff; }
+.chop .bay .ut { font: 600 12px/1.4 var(--f-mono); color: #b9b2c4; margin: 2px 0 6px; }
+.chop .bay .thumb { display: block; width: 100%; max-width: 360px; height: auto; margin: 4px 0 0; }
+.chop .bay .lift { height: 6px; margin: 0 0 10px; max-width: 360px; background: linear-gradient(90deg, transparent 6%, #c8102e 6% 16%, transparent 16% 84%, #c8102e 84% 94%, transparent 94%); }
+.chop .bay .buy { width: 100%; min-height: 48px; border-radius: 4px; border: 0; background: #f2b705; color: #16131a; font: 900 15px var(--f-body); letter-spacing: .08em; text-transform: uppercase; box-shadow: 0 4px 0 #7a5c00; }
+.chop .bay .buy:disabled { background: #3a3540; color: #8d8698; box-shadow: none; }
+.chop .bay .us { margin-top: 8px; font: 600 12px var(--f-mono); color: #9a93a6; }
+.chop .empty { font: 600 13px var(--f-mono); color: #9a93a6; padding: 6px 2px; }
 /* v244 — Black Market has its own tab and card */
 .gtabs button[hidden] { display: none !important; }
 .bmcard { border: 1px solid #a8324a; border-radius: 6px 16px 6px 16px; padding: 12px; background: linear-gradient(180deg, #2a0f26 0%, #120a1e 55%, #0a0b1c 100%); box-shadow: inset 0 1px 0 rgba(255,120,150,.18), 0 0 22px rgba(255,59,92,.14); }
@@ -4479,39 +4520,105 @@ function renderBuilder(U) {
 $('dyRun').onclick = dynoRun; $('dyClear').onclick = () => { DYNO.ghost = null; renderDynoTab(); };
 document.querySelector('.stats').onclick = e => { if (e.target.closest('canvas')) return; e.currentTarget.classList.toggle('open'); renderStats(); };
 const bmOpen = () => !!(save.wins && save.wins[4]);
+/* the chop shop scene above the service desk: 192x72 pixel art, drawn once per visit */
+const CHOP_GLYPH = { C: '111100100100111', H: '101101111101101', O: '111101101101111', P: '111101111100100', S: '111100111001111', E: '111100110100111', R: '110101110101101', V: '101101101101010', I: '111010010010111', N: '101111111101101', '2': '111001111100111', '4': '101101111001001', '7': '111001010010010', '/': '001001010100100', ' ': '000000000000000' };
+function chopText(g, str, x, y, col, sc, glow) {
+  sc = sc || 1;
+  for (let k = 0; k < str.length; k++) { const gl = CHOP_GLYPH[str[k]] || CHOP_GLYPH[' ']; for (let i = 0; i < 15; i++) if (gl[i] === '1') { const px = x + (k * 4 + i % 3) * sc, py = y + Math.floor(i / 3) * sc;
+    if (glow) { g.fillStyle = glow; g.fillRect(px - 1, py - 1, sc + 2, sc + 2); } } }
+  g.fillStyle = col;
+  for (let k = 0; k < str.length; k++) { const gl = CHOP_GLYPH[str[k]] || CHOP_GLYPH[' ']; for (let i = 0; i < 15; i++) if (gl[i] === '1') g.fillRect(x + (k * 4 + i % 3) * sc, y + Math.floor(i / 3) * sc, sc, sc); }
+}
+function drawChopScene(cv) {
+  cv.width = 192; cv.height = 72; const g = cv.getContext('2d'), R = (c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+  /* cinder block wall */
+  R('#1d1a22', 0, 0, 192, 72);
+  for (let y = 0; y < 52; y += 6) for (let x = (y / 6) % 2 ? -6 : 0; x < 192; x += 12) { R('#24202a', x + 1, y + 1, 10, 4); R('#2a2530', x + 1, y + 1, 10, 1); }
+  /* roll-up door, half open, a car under a tarp inside */
+  R('#3a3540', 6, 8, 66, 44); R('#07060c', 9, 11, 60, 41);
+  const fl = g.createLinearGradient(0, 30, 0, 52); fl.addColorStop(0, 'rgba(255,140,40,0)'); fl.addColorStop(1, 'rgba(255,140,40,.35)'); g.fillStyle = fl; g.fillRect(9, 30, 60, 22);
+  R('#11131a', 16, 44, 7, 7); R('#11131a', 52, 44, 7, 7);
+  g.fillStyle = '#3c4a3b'; g.beginPath(); g.moveTo(12, 47); g.lineTo(14, 40); g.lineTo(26, 38); g.lineTo(33, 31); g.lineTo(47, 31); g.lineTo(55, 38); g.lineTo(65, 40); g.lineTo(66, 47); g.closePath(); g.fill();
+  R('#2c382c', 26, 38, 30, 1); R('#2c382c', 38, 32, 1, 14); R('#4f5e4d', 33, 32, 12, 1); R('#2c382c', 20, 41, 1, 6); R('#2c382c', 58, 41, 1, 6);
+  for (let y = 11; y < 29; y += 3) { R('#5a5560', 9, y, 60, 2); R('#46424c', 9, y + 2, 60, 1); }
+  R('#2a262f', 9, 29, 60, 2); R('#f2b705', 36, 27, 6, 2);
+  /* concrete floor in front of the door: oil stain, a stack of tires, a jack */
+  R('#26232b', 0, 52, 76, 20); for (let x = 0; x < 76; x += 9) R('#2e2a33', x, 52, 1, 20); R('#1a1820', 0, 52, 76, 1);
+  R('#0f0e13', 18, 62, 22, 4); R('#15131a', 22, 61, 14, 1); R('rgba(120,90,160,.25)', 24, 63, 6, 1);
+  for (let k = 0; k < 3; k++) { R('#121216', 52, 66 - k * 5, 16, 5); R('#2a2a30', 52, 66 - k * 5, 16, 1); R('#3a3a42', 58, 67 - k * 5, 4, 3); }
+  R('#c8102e', 6, 64, 10, 3); R('#8a0c20', 6, 67, 10, 1); R('#9aa0a8', 14, 60, 2, 5); R('#9aa0a8', 12, 59, 6, 1);
+  /* green OPEN sign over the door */
+  R('#0b1a10', 24, 1, 30, 7); chopText(g, 'OPEN 24/7', 25, 2, '#5dff9a', 1, 'rgba(55,240,138,.25)');
+  /* neon CHOP SHOP */
+  chopText(g, 'CHOP SHOP', 84, 6, '#ffd0e6', 2, 'rgba(255,79,163,.35)');
+  /* pegboard with hanging parts */
+  R('#5e4f38', 160, 6, 30, 42); for (let y = 9; y < 46; y += 4) for (let x = 163; x < 189; x += 4) R('#3e3424', x, y, 1, 1);
+  R('#15151a', 163, 12, 11, 11); R('#9aa0a8', 165, 14, 7, 7); R('#15151a', 167, 16, 3, 3);
+  R('#b9bec6', 177, 11, 3, 22); R('#8a8f98', 177, 33, 8, 3); R('#5a5e66', 184, 32, 3, 5);
+  R('#c8102e', 163, 30, 2, 12); R('#c8102e', 167, 28, 2, 14); R('#d0d4da', 162, 27, 4, 3); R('#d0d4da', 166, 25, 4, 3);
+  /* SERVICE plate on chains */
+  R('#5a5e66', 104, 18, 1, 6); R('#5a5e66', 132, 18, 1, 6); R('#f2b705', 98, 23, 40, 9); R('#7a5c00', 98, 31, 40, 1); chopText(g, 'SERVICE', 104, 25, '#16131a', 1);
+  /* the man behind the desk: hood up, cap, cigarette */
+  R('#0e0d12', 140, 30, 14, 20); R('#0e0d12', 136, 38, 22, 12); R('#17161d', 142, 28, 10, 6); R('#17161d', 140, 30, 2, 4);
+  R('#3a2a1e', 142, 28, 10, 1); R('#3a2a1e', 154, 31, 1, 7); R('#3a2a1e', 158, 38, 1, 12);
+  R('#c8102e', 152, 36, 1, 1); R('#ff8a3a', 153, 36, 1, 1); R('rgba(200,200,210,.35)', 154, 32, 1, 3); R('rgba(200,200,210,.25)', 155, 29, 1, 3);
+  /* service desk: steel top, diamond plate front */
+  R('#b9bec6', 76, 50, 116, 2); R('#7e838c', 76, 52, 116, 2); R('#4a4e56', 76, 54, 116, 18);
+  for (let y = 56; y < 72; y += 4) for (let x = 78 + (y % 8 ? 2 : 0); x < 192; x += 6) { R('#5d626c', x, y, 2, 1); R('#3a3d44', x + 1, y + 1, 2, 1); }
+  /* old CRT with a green screen, a bell, a clipboard */
+  R('#3a3740', 82, 37, 18, 13); R('#0c2a16', 84, 39, 14, 9); R('#37f08a', 85, 40, 8, 1); R('#37f08a', 85, 42, 11, 1); R('#37f08a', 85, 44, 6, 1); R('#2a2730', 86, 49, 10, 1);
+  R('#d4a62a', 120, 47, 7, 3); R('#f2d36a', 121, 46, 4, 1); R('#8a6a12', 119, 49, 9, 1); R('#f7e6a0', 123, 45, 1, 1);
+  R('#8a6a3e', 104, 45, 10, 5); R('#efe6cf', 105, 44, 8, 5); R('#5a5e66', 107, 43, 4, 2); R('#8a7d62', 106, 46, 6, 1);
+  /* sodium light from above */
+  const sl = g.createRadialGradient(118, 0, 4, 118, 0, 90); sl.addColorStop(0, 'rgba(255,178,26,.22)'); sl.addColorStop(1, 'rgba(255,178,26,0)'); g.fillStyle = sl; g.fillRect(0, 0, 192, 72);
+  R('#f2c35a', 112, 0, 12, 1);
+}
 function renderBlack(U) {
   const day = dayKey(); if (!save.bm || save.bm.d !== day) save.bm = { d: day, bought: [] };
   const bm = save.bm, bmD = challengesToday().all ? 0.8 : 1; let h = 11; for (let c = 0; c < day.length; c++) h = (h * 31 + day.charCodeAt(c)) >>> 0;
   const rnd = () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
   const e = curEng(), eb = ebState(), beaten = Object.keys(save.wins).filter(k => save.wins[k]).length;
-  const head = mk('div', 'bhead'); head.appendChild(mk('div', 'un', 'The Black Market')); head.appendChild(mk('div', 'us', 'A van behind the old tower. No receipts, no questions, no returns. Stock changes every day, and everything is cheap if you know the right person.' + (bmD < 1 ? ' You finished all three of today\'s challenges, so the driver knocks 20% off.' : ''))); U.appendChild(head);
+  U.classList.add('chop');
+  U.appendChild(mk('div', 'haz'));
+  const sc = document.createElement('canvas'); sc.className = 'scene'; sc.setAttribute('role', 'img'); sc.setAttribute('aria-label', 'A chop shop: a half-open roll-up door with a car under a tarp, a neon sign, a pegboard of parts and a man behind the service desk'); try { drawChopScene(sc); } catch (_) {} U.appendChild(sc);
+  const IN = mk('div', 'inner'); U.appendChild(IN);
+  const desk = mk('div', 'desk'); desk.appendChild(mk('div', 'plate', 'SERVICE DESK'));
+  desk.appendChild(mk('div', 'note', '"No receipts, no questions, no returns. What\'s on the shelf changes every day, and it\'s all cheap if you know the right person."'));
+  if (bmD < 1) desk.appendChild(mk('div', 'deal', 'You finished today\'s three challenges. 20% off everything.'));
+  IN.appendChild(desk);
   /* hot parts: five parts your engine accepts, seeded by the date, at about 55% of shop price */
   const pool = []; SLOTS.forEach(sl => { if (sl.key === 'fi' || slotHidden(e, eb, sl) || (!sl.any && archOf(e) === 'x')) return; sl.opts.slice(1).forEach(o => { if (o && o.c >= 900 && !compat(e, eb, o)) pool.push(o); }); });
   const picks = []; const pl = pool.slice(); while (picks.length < 5 && pl.length) picks.push(pl.splice(Math.floor(rnd() * pl.length), 1)[0]);
-  U.appendChild(mk('h3', 'bgrp', 'Hot parts'));
-  if (!picks.length) U.appendChild(mk('div', 'us', 'Nothing in the van fits this engine today.'));
-  picks.forEach(o => {
-    const price = Math.round(o.c * 0.55 * bmD / 10) * 10, sold = bm.bought.includes(o.id), row = mk('div', 'opt'), left = mk('div'), acts = mk('div', 'acts2');
-    left.appendChild(mk('div', 'on', o.n)); left.appendChild(mk('div', 'ox', partFx(o))); left.appendChild(mk('div', 'oq', 'Shop price ' + money(o.c) + ' · you pay ' + money(price)));
-    if (sold) acts.appendChild(mk('div', 'status', 'Sold'));
-    else { const go = inst => { if (save.cash < price) return; save.cash -= price; bm.bought.push(o.id); save.inv[o.id] = (save.inv[o.id] || 0) + 1; if (inst) fitPart(o); else { persist(); renderGarage(); } };
+  IN.appendChild(mk('h3', 'bgrp', 'Hot parts'));
+  if (!picks.length) IN.appendChild(mk('div', 'empty', 'Nothing on the shelf fits this engine today.'));
+  const list = mk('div'); IN.appendChild(list);
+  picks.forEach((o, k) => {
+    const price = Math.round(o.c * 0.55 * bmD / 10) * 10, sold = bm.bought.includes(o.id), row = mk('div', 'tkt' + (sold ? ' sold' : '')), left = mk('div'), acts = mk('div', 'acts2');
+    left.appendChild(mk('div', 'tno', 'WORK ORDER #' + String(400 + ((h >>> (k * 3)) % 500)).padStart(4, '0')));
+    left.appendChild(mk('div', 'on', o.n)); left.appendChild(mk('div', 'ox', partFx(o)));
+    const q = mk('div', 'oq'); q.appendChild(document.createTextNode('Shop price ')); q.appendChild(mk('s', null, money(o.c))); q.appendChild(document.createTextNode(' · you pay ')); q.appendChild(mk('b', null, money(price))); left.appendChild(q);
+    row.appendChild(left);
+    if (sold) row.appendChild(mk('div', 'stamp', 'SOLD'));
+    else { row.appendChild(mk('div', 'stamp', 'HOT'));
+      const go = inst => { if (save.cash < price) return; save.cash -= price; bm.bought.push(o.id); save.inv[o.id] = (save.inv[o.id] || 0) + 1; if (inst) fitPart(o); else { persist(); renderGarage(); } };
       const b1 = mk('button', 'buy', 'Buy & install ' + money(price)); b1.type = 'button'; b1.disabled = save.cash < price; b1.onclick = () => go(true); acts.appendChild(b1);
-      const b2 = mk('button', 'buy alt', 'Buy only'); b2.type = 'button'; b2.disabled = save.cash < price; b2.onclick = () => go(false); acts.appendChild(b2); }
-    row.appendChild(left); row.appendChild(acts); U.appendChild(row);
+      const b2 = mk('button', 'buy alt', 'Buy only'); b2.type = 'button'; b2.disabled = save.cash < price; b2.onclick = () => go(false); acts.appendChild(b2); row.appendChild(acts); }
+    list.appendChild(row);
   });
   /* backroom car: a car the strip has not unlocked for you yet, no win needed, at a premium */
   const cands = CARS.filter(c => !save.ownedCars.includes(c.id) && c.req > beaten && c.req <= beaten + 4), any = CARS.filter(c => !save.ownedCars.includes(c.id));
   const cl = cands.length ? cands : any, car = cl.length ? cl[Math.floor(rnd() * cl.length)] : null;
-  U.appendChild(mk('h3', 'bgrp', 'Backroom car'));
-  if (!car) U.appendChild(mk('div', 'us', 'You already own everything on the van.'));
+  IN.appendChild(mk('h3', 'bgrp', 'Back bay'));
+  if (!car) IN.appendChild(mk('div', 'empty', 'The back bay is empty. You already own everything.'));
   else {
-    const price = Math.round(car.price * 1.4 * bmD / 50) * 50, sold = bm.bought.includes('car:' + car.id), row = mk('div', 'up'), left = mk('div');
-    left.appendChild(mk('div', 'un', car.name)); left.appendChild(mk('div', 'ut', car.tag));
-    const cvs = document.createElement('canvas'); cvs.className = 'thumb'; left.appendChild(cvs); try { drawCarThumb(cvs, car, freshBuild(car)); } catch (_) {}
-    row.appendChild(left);
-    const b = mk('button', 'buy', sold ? 'Sold' : garageFull() ? 'Garage full' : money(price)); b.type = 'button'; b.disabled = sold || garageFull() || save.cash < price;
+    const price = Math.round(car.price * 1.4 * bmD / 50) * 50, sold = bm.bought.includes('car:' + car.id), row = mk('div', 'bay');
+    row.appendChild(mk('div', 'bayno', 'BAY 2'));
+    row.appendChild(mk('div', 'un', car.name)); row.appendChild(mk('div', 'ut', car.tag));
+    const cvs = document.createElement('canvas'); cvs.className = 'thumb'; row.appendChild(cvs); try { drawCarThumb(cvs, car, freshBuild(car)); } catch (_) {}
+    row.appendChild(mk('div', 'lift'));
+    const b = mk('button', 'buy', sold ? 'Sold' : garageFull() ? 'Garage full' : 'Take it · ' + money(price)); b.type = 'button'; b.disabled = sold || garageFull() || save.cash < price;
     b.onclick = () => { if (save.cash < price || sold || garageFull()) return; save.cash -= price; bm.bought.push('car:' + car.id); save.ownedCars.push(car.id); save.cars[car.id] = freshBuild(car); markFab(car.id, car.eng); if (!save.owned.includes(car.eng)) save.owned.push(car.eng); switchCar(car.id); };
-    row.appendChild(b); row.appendChild(mk('div', 'us', car.drive + ' · ' + (car.req > beaten ? 'normally needs ' + (car.req - beaten) + ' more wins · ' : '') + 'premium ' + money(price))); U.appendChild(row);
+    row.appendChild(b); row.appendChild(mk('div', 'us', car.drive + ' · ' + (car.req > beaten ? 'normally needs ' + (car.req - beaten) + ' more wins · ' : '') + 'premium ' + money(price))); IN.appendChild(row);
   }
   persist();
 }
