@@ -3989,7 +3989,7 @@ function drawCarThumb(cv, car, build) {
     ctx.fillStyle = '#1a2240'; ctx.fillRect(0, h * 0.86, w, h * 0.14);
   }
   const dummy = { x: 4.4 + (w / ppm - 4.4) / 2, a: 0, wang: 0.3, flame: 0, nos: 0, finished: false, v: 0 };
-  car.trim.tint = tintSpec(car.id); car.trim.brush = brushOf(car.id); car.trim.rh = rhOf(car.id); car.trim.wp = wheelP(car.id); car.trim.dr = DRV(car.drive); car.trim.ws = wheelSz(car.id); car.trim.gt = gtOf(car.id);
+  car.trim.tint = tintSpec(car.id); car.trim.brush = brushOf(car.id); car.trim.rh = rhOf(car.id); car.trim.wp = wheelP(car.id); car.trim.dr = DRV(car.drive); car.trim.ws = wheelSz(car.id); car.trim.cc = calOf(car.id); car.trim.gt = gtOf(car.id);
   drawCar(dummy, h * 0.86, 1, build.paint, BODIES[build.body].roof, build.glow, build.stripe, build.wheels, car.trim);
   ctx = sctx; W = sW; H = sH; ppm = sp; camX = sc;
 }
@@ -4241,6 +4241,14 @@ function renderLooks() {
       rg2.oninput = () => { if (!save.rimSz) save.rimSz = {}; save.rimSz[save.car] = +rg2.value / 100; sv.textContent = rg2.value + '%'; persist(); drawPreview(); };
       rg2.onchange = () => renderCars();
       sr.appendChild(sl); sr.appendChild(rg2); sr.appendChild(sv); box.appendChild(sr);
+
+      const cl = document.createElement('div'); cl.className = 'setrow'; const clab = document.createElement('span'); clab.textContent = 'Brake calipers'; clab.style.fontWeight = '700'; cl.appendChild(clab); box.appendChild(cl);
+      const cs = document.createElement('div'); cs.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 10px'; const curC = calOf(save.car);
+      CALIPER_COLORS.forEach(([nm, hex]) => { const b = document.createElement('button'); b.type = 'button'; b.title = nm; b.setAttribute('aria-label', nm + ' brake calipers'); const on = curC === hex; b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.style.cssText = 'width:40px;height:40px;border-radius:8px;padding:4px;background:#0d1020;border:2px solid ' + (on ? 'var(--sodium)' : 'var(--line)');
+        const sw = document.createElement('span'); sw.style.cssText = 'display:block;width:100%;height:100%;border-radius:4px;background:' + hex + ';box-shadow:inset 0 -4px 0 rgba(0,0,0,.35)'; b.appendChild(sw);
+        b.onclick = () => { if (!save.calColor) save.calColor = {}; save.calColor[save.car] = hex; persist(); renderLooks(); drawPreview(); renderCars(); }; cs.appendChild(b); });
+      box.appendChild(cs);
     }
     { const ph1 = document.createElement('div'); ph1.className = 'setrow'; const h1 = document.createElement('span'); h1.textContent = 'Rival cars'; h1.style.fontWeight = '700'; ph1.appendChild(h1); box.appendChild(ph1);
       if (!save.rivalAdj) save.rivalAdj = {}; if (typeof save.rivalSel !== 'number') save.rivalSel = Math.min(save.rival || 0, RIVALS.length - 1);
@@ -4760,7 +4768,7 @@ function drawPreview() {
   ctx = pctx; W = r.width; H = r.height; ppm = Math.min(W / 6.4, H / 1.9); camX = 0;
   garageScene(ctx, W, H, GANIM.on ? performance.now() : 0);
   const dummy = { x: 4.4 + (W / ppm - 4.4) / 2, a: 0, wang: 0.3, flame: 0, nos: 0, finished: false, v: 0 };
-  curCar().trim.tint = tintSpec(save.car); curCar().trim.brush = brushOf(save.car); curCar().trim.rh = rhOf(save.car); curCar().trim.wp = wheelP(save.car); curCar().trim.dr = DRV(curCar().drive); curCar().trim.ws = wheelSz(save.car); curCar().trim.gt = gtOf(save.car);
+  curCar().trim.tint = tintSpec(save.car); curCar().trim.brush = brushOf(save.car); curCar().trim.rh = rhOf(save.car); curCar().trim.wp = wheelP(save.car); curCar().trim.dr = DRV(curCar().drive); curCar().trim.ws = wheelSz(save.car); curCar().trim.cc = calOf(save.car); curCar().trim.gt = gtOf(save.car);
   ctx.save(); ctx.beginPath(); ctx.rect(0, H * 0.8, W, H * 0.2); ctx.clip(); ctx.translate(0, H * 1.6); ctx.scale(1, -1); ctx.globalAlpha = 0.2;
   drawCar(dummy, H * 0.8, 1, save.paint, BODIES[save.body].roof, save.glow, save.stripe, save.wheels, curCar().trim); ctx.restore(); /* wet-floor reflection */
   drawCar(dummy, H * 0.8, 1, save.paint, BODIES[save.body].roof, save.glow, save.stripe, save.wheels, curCar().trim);
@@ -4930,7 +4938,7 @@ function storyCar(s, ph) {
   try {
     let key, trim, color, roof;
     if (s.img) { const rv = s.rv != null ? RIVALS[s.rv] : RIVALS.find(r => r.img === s.img); key = s.img; trim = rv ? rivalTrim(rv) : { img: s.img }; color = rv ? rv.color : '#888888'; roof = rv ? rv.roof : 1; }
-    else { const c = curCar(); key = c.trim.img; c.trim.tint = tintSpec(save.car); c.trim.brush = brushOf(save.car); c.trim.rh = rhOf(save.car); c.trim.wp = wheelP(save.car); c.trim.dr = DRV(c.drive); c.trim.ws = wheelSz(save.car); c.trim.gt = gtOf(save.car); trim = c.trim; color = save.paint; roof = BODIES[save.body].roof; }
+    else { const c = curCar(); key = c.trim.img; c.trim.tint = tintSpec(save.car); c.trim.brush = brushOf(save.car); c.trim.rh = rhOf(save.car); c.trim.wp = wheelP(save.car); c.trim.dr = DRV(c.drive); c.trim.ws = wheelSz(save.car); c.trim.cc = calOf(save.car); c.trim.gt = gtOf(save.car); trim = c.trim; color = save.paint; roof = BODIES[save.body].roof; }
     if (!key || !carImg(key) || !carImg(key).complete) return ph.src;
     const P = 160, w = Math.round(6.4 * P), h = Math.round(2.6 * P), cv = document.createElement('canvas'); cv.width = w; cv.height = h;
     const sW = W, sH = H, sp = ppm, sc = camX, sctx = ctx;
@@ -5166,14 +5174,17 @@ function carImg(key) {
 }
 /* ---- big-brake look: a slotted, drilled rotor and a red caliper sit behind every aftermarket rim and grow with the rim size; a coilover peeks out of each wheel well ---- */
 const BRAKE_PX = 64;
-let ROTOR_CV = null, CALIPER_CV = null;
+let ROTOR_CV = null;
+const CALIPER_CV = {};
+const CALIPER_COLORS = [['Red', '#de2232'], ['Yellow', '#f5c518'], ['Orange', '#ff7a1a'], ['Blue', '#2a6cf0'], ['Green', '#2fbf55'], ['Purple', '#8a3ff0'], ['Pink', '#ff4fa3'], ['Gold', '#d4a62a'], ['Silver', '#b8bcc6'], ['Black', '#2a2b31']];
+function calOf(cid) { const v = save.calColor && save.calColor[cid]; return typeof v === 'string' ? v : CALIPER_COLORS[0][1]; }
 function brakeSprites() {
   if (ROTOR_CV) return;
   const mk = () => { const c = document.createElement('canvas'); c.width = c.height = BRAKE_PX; return c; };
-  ROTOR_CV = mk(); CALIPER_CV = mk();
-  const rc = ROTOR_CV.getContext('2d'), cc = CALIPER_CV.getContext('2d');
-  const rd = rc.createImageData(BRAKE_PX, BRAKE_PX), cd = cc.createImageData(BRAKE_PX, BRAKE_PX);
-  const C = BRAKE_PX / 2, barrel = C * 0.62, ro = C * 0.55, hat = ro * 0.38, cal = [222, 34, 50];
+  ROTOR_CV = mk();
+  const rc = ROTOR_CV.getContext('2d');
+  const rd = rc.createImageData(BRAKE_PX, BRAKE_PX);
+  const C = BRAKE_PX / 2, barrel = C * 0.62, ro = C * 0.55, hat = ro * 0.38;
   const mix = (a, b, t) => { t = Math.max(0, Math.min(1, t)); return [0, 1, 2].map(i => Math.round(a[i] + (b[i] - a[i]) * t)); };
   const put = (img, x, y, c) => { const o = (y * BRAKE_PX + x) * 4; img.data[o] = c[0]; img.data[o + 1] = c[1]; img.data[o + 2] = c[2]; img.data[o + 3] = 255; };
   for (let y = 0; y < BRAKE_PX; y++) for (let x = 0; x < BRAKE_PX; x++) {
@@ -5192,21 +5203,31 @@ function brakeSprites() {
       }
       put(rd, x, y, c);
     }
-    /* caliper: top of the rotor toward the back of the car (the cars face right) */
-    if (ang >= 192 && ang <= 256 && d > ro * 0.42 && d <= ro + 2.4) {
-      const edge = d > ro + 1.1 || d < ro * 0.42 + 1.6 || ang < 196 || ang > 252;
-      let c = edge ? [110, 10, 22] : mix(cal, [255, 130, 130], (light - 0.35) * 1.4);
-      if (!edge && ang >= 212 && ang <= 236 && Math.abs(d - ro * 0.8) < 1) c = [255, 236, 236];
-      put(cd, x, y, c);
-    }
   }
-  rc.putImageData(rd, 0, 0); cc.putImageData(cd, 0, 0);
+  rc.putImageData(rd, 0, 0);
+}
+/* caliper: top of the rotor toward the back of the car (the cars face right), one sprite per color */
+function caliperSprite(hex) {
+  if (CALIPER_CV[hex]) return CALIPER_CV[hex];
+  const cv = document.createElement('canvas'); cv.width = cv.height = BRAKE_PX; const cc = cv.getContext('2d'), cd = cc.createImageData(BRAKE_PX, BRAKE_PX);
+  const n = parseInt(hex.slice(1), 16), cal = [n >> 16 & 255, n >> 8 & 255, n & 255], dark = cal.map(v => Math.round(v * 0.45)), lite = cal.map(v => Math.min(255, v + 90));
+  const C = BRAKE_PX / 2, ro = C * 0.55;
+  for (let y = 0; y < BRAKE_PX; y++) for (let x = 0; x < BRAKE_PX; x++) {
+    const dx = x + 0.5 - C, dy = y + 0.5 - C, d = Math.hypot(dx, dy), ang = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+    if (!(ang >= 192 && ang <= 256 && d > ro * 0.42 && d <= ro + 2.4)) continue;
+    const light = Math.max(0, (-dx * 0.6 - dy * 0.8) / Math.max(d, 0.01)), t = Math.max(0, Math.min(1, (light - 0.35) * 1.4));
+    const edge = d > ro + 1.1 || d < ro * 0.42 + 1.6 || ang < 196 || ang > 252;
+    let c = edge ? dark : cal.map((v, i) => Math.round(v + (lite[i] - v) * t));
+    if (!edge && ang >= 212 && ang <= 236 && Math.abs(d - ro * 0.8) < 1) c = [250, 248, 246];
+    const o = (y * BRAKE_PX + x) * 4; cd.data[o] = c[0]; cd.data[o + 1] = c[1]; cd.data[o + 2] = c[2]; cd.data[o + 3] = 255;
+  }
+  cc.putImageData(cd, 0, 0); return CALIPER_CV[hex] = cv;
 }
 /* the rotor turns with the wheel; the caliper stays put. D is the drawn wheel size, so the brakes scale with the rim size slider */
-function drawBrakes(cx, cy, D, va) {
+function drawBrakes(cx, cy, D, va, cc) {
   brakeSprites();
   ctx.save(); ctx.translate(cx, cy); ctx.rotate(va); ctx.drawImage(ROTOR_CV, -D / 2, -D / 2, D, D); ctx.restore();
-  ctx.drawImage(CALIPER_CV, cx - D / 2, cy - D / 2, D, D);
+  ctx.drawImage(caliperSprite(cc || CALIPER_COLORS[0][1]), cx - D / 2, cy - D / 2, D, D);
 }
 /* coilover from the hub up into the fender; drawn before the body so the fender covers all but the gap above the tire */
 function drawCoilover(cx, cy, R) {
@@ -5220,7 +5241,7 @@ function drawCoilover(cx, cy, R) {
   }
   ctx.restore();
 }
-function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt) {
+function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt, cc) {
   const ih = L * ph.ar, nw = im.naturalWidth || im.width, nh = im.naturalHeight || im.height, lift = ph.ex * L;
   // wheel spin: cap the visible rotation speed and blur beyond it, so fast wheels never strobe
   /* worked out once per frame per car: the wet-floor reflection draws each car a second time, and that second look used to eat the spin and the blur */
@@ -5250,7 +5271,7 @@ function drawPhoto(im, ph, r, L, wp, ws, dr, rh, gt) {
     ph.wh.forEach((w, i) => {
       const big = wp >= 16, z = ws > 0 ? ws : 0.9, cx = w[0] * L, cy = -ih + w[1] * ih - (z > 1 ? ph.tr[i] * L * (z - 1) : 0), D = ph.tr[i] * L * 2 * z * (64 / 62);
       const sweep = swOf(i), va = vaOf(i), n = sweep ? 5 : 1;
-      drawBrakes(cx, cy, D, va);
+      drawBrakes(cx, cy, D, va, cc);
       for (let k = 0; k < n; k++) { ctx.save(); ctx.globalAlpha = 1 / (k + 1); ctx.translate(cx, cy); ctx.rotate(va - (sweep ? sweep * k / (n - 1) : 0)); ctx.drawImage(WI, -D / 2, -D / 2, D, D); ctx.restore(); }
     });
     ctx.restore(); return;
@@ -5345,7 +5366,7 @@ function drawCar(r, base, sc, color, roof, glowRgb, stripe, wst, trim) {
   r._pt = (r._pt || 0) + (pTarget - (r._pt || 0)) * 0.1;
   const pitch = r._pt;
   ctx.save(); ctx.translate(0.2 * L, -0.075 * L); ctx.rotate(-pitch); ctx.translate(-0.2 * L, 0.075 * L);
-  if (IM) { drawPhoto(IM, PHOTOS[trim.img], r, L, trim.wp, trim.ws, trim.dr, trim.rh, trim.gt); ctx.restore(); } else {
+  if (IM) { drawPhoto(IM, PHOTOS[trim.img], r, L, trim.wp, trim.ws, trim.dr, trim.rh, trim.gt, trim.cc); ctx.restore(); } else {
   let hr = 0.335 * ro;
   let body = new Path2D();
   let win = null, wx1 = 0.2 * L, wx2 = 0.8 * L, wyy = 0.078 * L, wrr = 0.078 * L, wellR = 0.092 * L, wellY = 0.075 * L;
@@ -5624,7 +5645,7 @@ function draw() {
     drawCar(o, farBase, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl)); ctx.restore(); }
   drawCar(o, farBase, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl));
   for (const pt of particles) if (pt.r === 1) puff(pt, farBase, 0.88, sx);
-  curCar().trim.tint = tintSpec(save.car); curCar().trim.brush = brushOf(save.car); curCar().trim.rh = rhOf(save.car); curCar().trim.wp = wheelP(save.car); curCar().trim.dr = DRV(curCar().drive); curCar().trim.ws = wheelSz(save.car); curCar().trim.gt = gtOf(save.car);
+  curCar().trim.tint = tintSpec(save.car); curCar().trim.brush = brushOf(save.car); curCar().trim.rh = rhOf(save.car); curCar().trim.wp = wheelP(save.car); curCar().trim.dr = DRV(curCar().drive); curCar().trim.ws = wheelSz(save.car); curCar().trim.cc = calOf(save.car); curCar().trim.gt = gtOf(save.car);
   if (wet) { ctx.save(); ctx.beginPath(); ctx.rect(0, nearBase, W, curbBot - nearBase); ctx.clip(); ctx.translate(0, nearBase * 2); ctx.scale(1, -1); ctx.globalAlpha = 0.2;
     drawCar(p, nearBase, 1, save.paint, BODIES[save.body].roof, save.glow, save.stripe, save.wheels, curCar().trim); ctx.restore(); }
   drawCar(p, nearBase, 1, save.paint, BODIES[save.body].roof, save.glow, save.stripe, save.wheels, curCar().trim);
