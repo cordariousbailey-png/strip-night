@@ -823,6 +823,7 @@ body, #app { background:#08080e; }
   .sec[data-gt="shop"] .stats .more { display: block !important; margin: 2px 0 0; font-size: 10px; }
 }
 
+.mk.tuned { background: rgba(255,122,26,.18); color: #ffb070; border-color: rgba(255,122,26,.5); }
 /* online tab */
 .olcard { padding: 12px; margin: 0 0 12px; border-radius: 12px; background: #120f22; border: 1px solid #2c2550; }
 .olh { font: 800 12px var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: #b9a8ff; margin-bottom: 8px; }
@@ -2485,6 +2486,23 @@ function hcpText(mu, name) { return mu.off > 0 ? name + ' waits ' + mu.off.toFix
 /* rivals run about 0.17 s behind their rating in total (reaction plus quarter-mile), so an equally rated player wins only when driving well; the first three get a little extra power to make up for slow reactions */
 RIVAL_CLS[4] = 'sna'; [10, 11, 14, 21].forEach(i => { RIVAL_CLS[i] = 'mna'; }); /* Kimi's cam-switch four and the pro stock cars are all-motor */
 const RIVAL_EDGE = [0.980, 0.978, 0.979, 0.979, 0.978, 0.978, 0.969, 0.971, 0.971, 0.972, 0.972, 0.972, 0.966, 0.965, 0.965, 0.991, 0.994, 0.997, 1.001, 1.005, 0.995, 0.995, 0.995, 0.995, 0.995]; /* rivals leave on green now, so power is trimmed ~2% to keep races close; the late ladder is shaved a bit more so a good run can win */
+/* ---- tougher rivals ----
+   Rematch: every win against a ladder rival makes them tune up for next time (up to level 5): a little more power,
+   cleaner launches, fewer lazy starts.
+   Adaptive: in an even class match, a rival you out-built gets enough extra power to close 75% of the gap to your
+   car's expected time, so races stay close but upgrades still give you an edge. ET scales about with power^(-1/3). */
+const RM_MAX = 5;
+function rmLvl(i) { return i < NREAL && save.rw ? Math.min(RM_MAX, save.rw[i] || 0) : 0; }
+function rivalTune(i, pd) {
+  const r = RIVALS[i], lvl = rmLvl(i), out = { lvl, pw: 1 + 0.02 * lvl, mu: 1 + 0.006 * lvl, acc: Math.max(0.35, 1 - 0.12 * lvl), lazy: Math.max(0.1, 1 - 0.18 * lvl), adapt: 1, est: r.est };
+  out.est = r.est * Math.pow(out.pw, -1 / 3);
+  const mu = pd ? matchup(pd, i) : null;
+  if (i < NREAL && pd && mu && mu.kind === 'even' && pd.et < out.est) {
+    const target = out.est - 0.75 * (out.est - pd.et), f = Math.min(1.3, Math.pow(out.est / target, 3));
+    out.adapt = f; out.pw *= f; out.mu *= Math.min(1.06, Math.pow(f, 0.25)); out.est = target;
+  }
+  return out;
+}
 /* ---------- replay: a snapshot of both cars about 30 times a second ---------- */
 let rec = [], recAcc = 0, replay = null;
 const copyRacer = r => { const c = {}; for (const k in r) { if (!Object.prototype.hasOwnProperty.call(r, k)) continue; const t = typeof r[k]; if (t === 'number' || t === 'boolean' || t === 'string') c[k] = r[k]; } return c; };
@@ -2541,8 +2559,9 @@ function newRace() {
   opp.sv = r.voice; opp.sndm = r.snd; opp.nosAud = r.nosAud;
   opp.rt = 0.02 + Math.random() * 0.02; /* rivals leave on the green, no waiting around for them */
   if (MU.kind === 'hcp') opp.rt = Math.max(-1.35, opp.rt + MU.off);
-  opp.power *= 1 + (Math.random() - 0.5) * 0.024; if (Math.random() < 0.06) opp.rt += 0.06 + Math.random() * 0.08; /* rivals are not robots: a touch of power variance, and now and then a lazy launch */
-  opp.target = opp.idealRpm() + (Math.random() - 0.5) * 2 * r.acc; lcAdj = 1; goArmed = false;
+  const TN = rivalTune(save.rival, PD); opp.power *= TN.pw; opp.mu *= TN.mu; opp.tune = TN;
+  opp.power *= 1 + (Math.random() - 0.5) * 0.024; if (Math.random() < 0.06 * TN.lazy) opp.rt += 0.06 + Math.random() * 0.08; /* rivals are not robots: a touch of power variance, and now and then a lazy launch */
+  opp.target = opp.idealRpm() + (Math.random() - 0.5) * 2 * r.acc * TN.acc; lcAdj = 1; goArmed = false;
   player.trace = [];
   if (GHOST) opp = ghostRacer(GHOST);
   particles.length = 0;
@@ -3806,7 +3825,7 @@ function endRace(wasFoul) {
     const street = rvIdx >= NREAL, first = !street && !save.wins[save.rival];
     if (win) {
       prize = street || first ? rv.prize : Math.round(rv.prize * 0.35 / 5) * 5;
-      if (!street) save.wins[save.rival] = true; firstWin = first;
+      if (!street) { save.wins[save.rival] = true; if (!save.rw) save.rw = {}; save.rw[rvIdx] = Math.min(9, (save.rw[rvIdx] || 0) + 1); } firstWin = first;
       if (first && save.rival < NREAL - 1) { save.rival += 1; if (gated(save.rival)) { save.rival -= 1; gateNote = true; } else unlockedNext = RIVALS[save.rival].name; }
       if (first) { const nb = Object.keys(save.wins).filter(k => save.wins[k]).length; CARS.filter(c => c.req === nb && !save.ownedCars.includes(c.id)).forEach(c => unlockList.push({ kind: 'car', car: c })); if (unlockedNext) unlockList.unshift({ kind: 'rival', rv: RIVALS[save.rival] }); }
     } else prize = Math.round(rv.prize * (street ? 0.05 : 0.1) / 5) * 5;
@@ -3876,6 +3895,8 @@ function endRace(wasFoul) {
     chDone.forEach(c => { pay += '<span>Challenge: ' + esc(c.txt) + ' <em>+' + money(c.reward) + '</em></span>'; });
     if (dailyBonus) pay += '<span>Daily challenge <em>+' + money(dailyBonus) + ' (streak ' + save.daily.streak + ')</em></span>';
     if (rivBest) pay += '<span>Best vs ' + esc(rv.name) + ' <em>' + fmt(save.rb[rvIdx], 3) + ' s</em></span>';
+    if (win && rvIdx < NREAL) pay += '<span>' + esc(rv.name) + ' <em>' + (rmLvl(rvIdx) >= RM_MAX ? 'is fully tuned' : 'tunes up for the rematch \u00b7 Lv ' + rmLvl(rvIdx)) + '</em></span>';
+    if (opp && opp.tune && opp.tune.adapt > 1.001) pay += '<span>' + esc(rv.name) + ' <em>matched your build (+' + Math.round((opp.tune.adapt - 1) * 100) + '% power)</em></span>';
   }
   $('pay').innerHTML = pay;
   if (!wasFoul) save.adRaces = (save.adRaces || 0) + 1;
@@ -4043,10 +4064,11 @@ function renderGarage() {
     b.setAttribute('aria-pressed', save.rival === i ? 'true' : 'false');
     const add = (cls, t) => { const s = document.createElement('span'); s.className = cls; s.textContent = t; b.appendChild(s); };
     add('rn', r.name); add('rp', gated(i) ? 'Full game' : !open ? 'Locked' : save.wins[i] ? 'Beaten · ' + money(Math.round(r.prize * 0.35 / 5) * 5) : money(r.prize));
-    add('rc', r.car); add('re', 'PR ' + r.pr + ' · about ' + r.est.toFixed(1) + ' s');
+    add('rc', r.car); { let tn = null; try { tn = rivalTune(i, playerDesc()); } catch (_) {} const te = tn ? tn.est : r.est; add('re', 'PR ' + (Math.abs(te - r.est) > 0.005 ? prOf(te) : r.pr) + ' · about ' + te.toFixed(1) + ' s'); }
     { const k = document.createElement('span'), cl = CLS_BY[RIVAL_CLS[i]], mu = MUS[i]; k.className = 'rk';
       const dot = document.createElement('i'); dot.style.background = cl.col; k.appendChild(dot); k.appendChild(document.createTextNode(cl.name));
       if (save.wins[i]) { const st = document.createElement('span'); st.className = 'mk even'; st.textContent = starTxt(i) + (save.rb[i] != null ? ' ' + save.rb[i].toFixed(2) + ' s' : ''); k.appendChild(st); }
+      if (rmLvl(i)) { const lv = document.createElement('span'); lv.className = 'mk tuned'; lv.textContent = 'Tuned Lv ' + rmLvl(i); k.appendChild(lv); }
       if (unlocked(i)) { const m = document.createElement('span'); m.className = 'mk ' + mu.kind; m.textContent = mu.kind === 'even' ? 'Even match' : mu.kind === 'out' ? mu.why : mu.off > 0 ? 'You lead ' + mu.off.toFixed(2) + ' s' : 'They lead ' + (-mu.off).toFixed(2) + ' s'; k.appendChild(m); }
       b.appendChild(k); }
     b.onclick = () => { if (gated(i)) { gTab = 'store'; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0); return; } save.rival = i; persist(); renderGarage(); };
@@ -7310,13 +7332,13 @@ function vsCard(done) {
   if (!rv || !pd) { done(); return; }
   const old = $('vs'); if (old) old.remove();
   const el = document.createElement('div'); el.id = 'vs';
-  const youPR = prOf(pd.et), foePR = rv.pr != null ? rv.pr : prOf(rv.est), foeEt = rv.est;
+  const TN = rivalTune(save.rival, pd), foeEt = TN.est, youPR = prOf(pd.et), foePR = TN.est !== rv.est ? prOf(TN.est) : rv.pr != null ? rv.pr : prOf(rv.est);
   const pic = CHAR_PIX[rv.name] && CHAR_PIX[rv.name].src ? CHAR_PIX[rv.name].src : (rv.portrait && typeof STREET_IMG !== 'undefined' && STREET_IMG[rv.portrait]) || '';
   const bar = (a, b, lowerBetter) => { const t = (a + b) || 1, pa = lowerBetter ? b / t : a / t; return Math.round(Math.max(0.12, Math.min(0.88, pa)) * 100); };
   const rows = [['PR', youPR, foePR, bar(youPR, foePR, false), youPR >= foePR], ['EST. TIME', pd.et.toFixed(2) + ' s', foeEt.toFixed(2) + ' s', bar(pd.et, foeEt, true), pd.et <= foeEt], ['PRIZE', '', money(rv.prize || 0), 50, false]];
   el.innerHTML = '<div class="vs-side me"><canvas class="vs-car"></canvas><b>YOU</b><small>' + esc(curCar().name) + '</small></div>'
     + '<div class="vs-mid"><div class="vs-vs">VS</div><div class="vs-rows">' + rows.map(r => '<div class="vr"><span class="a' + (r[4] ? ' w' : '') + '">' + r[1] + '</span><em>' + r[0] + '</em><span class="b' + (!r[4] && r[0] !== 'PRIZE' ? ' w' : '') + '">' + r[2] + '</span><i class="vb"><u style="width:' + r[3] + '%"></u></i></div>').join('') + '</div><div class="vs-tap">TAP TO SKIP</div></div>'
-    + '<div class="vs-side foe">' + (pic ? '<img class="vs-pic" alt="" src="' + pic + '">' : '') + '<canvas class="vs-car"></canvas><b>' + esc(rv.name) + '</b><small>' + esc(rv.car || '') + '</small></div>';
+    + '<div class="vs-side foe">' + (pic ? '<img class="vs-pic" alt="" src="' + pic + '">' : '') + '<canvas class="vs-car"></canvas><b>' + esc(rv.name) + '</b><small>' + esc(rv.car || '') + (TN.lvl ? ' \u00b7 Tuned Lv ' + TN.lvl : '') + (TN.adapt > 1.001 ? ' \u00b7 matched your build' : '') + '</small></div>';
   document.body.appendChild(el);
   const cvs = el.querySelectorAll('canvas'), me = curCar();
   const paint = () => { try { drawCarThumb(cvs[0], me, pickBuild()); drawRivalThumb(cvs[1], rv); } catch (e) {} };
