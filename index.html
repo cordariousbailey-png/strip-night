@@ -3476,7 +3476,7 @@ function burnUpdate(h) {
     BURN.tick(P, S, h, 0, S.v);
     player.rpm += (1100 + 420 * S.v - player.rpm) * Math.min(1, h * 5);
     player.x = -BOX + Math.min(S.x, BOX); player.wangF = S.angF; player.wangR = S.angR;
-    const q = BURN.clamp((bn.oppT - 0.15) / 1.4, 0, 1); opp.x = -BOX + BOX * q * q * (3 - 2 * q);
+    const q = BURN.clamp((bn.oppT - 0.15) / 1.4, 0, 1), ox = opp.x; opp.x = -BOX + BOX * q * q * (3 - 2 * q); opp.wang += (opp.x - ox) / CAR.wheelR;
     burnTg(); burnPanelTick();
     if (rem <= 0.05 || bn.roll > 2.6) enterStage();
     return;
@@ -3575,7 +3575,7 @@ function setScrCt() { const s = $('scrSm'); if (s) s.textContent = player.scrFul
 function setNosCt() { setScrCt(); $('nosCt').textContent = player.nosLeft + ' left'; }
 function setGo(l, sm) { $('goLabel').textContent = l; $('goSmall').textContent = sm; }
 function enterStage() {
-  if (bn.P && phase === 'burnout') { player.x = 0; opp.x = 0; player.wang = Math.max(player.wangF, player.wangR); bn.st = 'done'; burnUI(false); syncWear(); if (!(save.seen && save.seen['b' + bn.P.drive])) { save.seen['b' + bn.P.drive] = 1; persist(); } }
+  if (bn.P && phase === 'burnout') { player.x = 0; opp.wang += (0 - opp.x) / CAR.wheelR; opp.x = 0; player.wang = Math.max(player.wangF, player.wangR); bn.st = 'done'; burnUI(false); syncWear(); if (!(save.seen && save.seen['b' + bn.P.drive])) { save.seen['b' + bn.P.drive] = 1; persist(); } }
   phase = 'stage'; phaseT = 0; treeWait = 1.7 + Math.random() * 0.7; goArmed = !!bn.armGo; $('btnGo').classList.toggle('on', goArmed);
   if (!AU.purged && save.nos > 0 && !AMS()) { AU.purged = true; setTimeout(sfxPurge, 350); }
   if (bn.P) { const g = (player.tg - 1) * 100; if (g >= 0.8) callout('Tires hot', 'ok', 'grip +' + g.toFixed(1) + '%'); else if (g <= -1.5) callout('Tires overheated', 'warn', 'grip ' + g.toFixed(1) + '%'); }
