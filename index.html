@@ -5423,7 +5423,7 @@ function rivalAdj(rv, t) {
 const GT_NAMES = ['Off', 'Light', 'Mid', 'Dark', 'Limo'], GT_A = [0, .38, .62, .82, .94], GLASSC = {};
 /* body kits: a second sprite for some cars. save.kit[car] is 'own' (bought, stock look showing) or 'on' */
 const KITS = { e92: { img: 'e92k', name: 'Aero kit', price: 1500 }, g35: { img: 'g35k', name: 'Aero kit', price: 1200 }, r35: { img: 'r35w', name: 'Widebody', price: 4500 } };
-function kitImg(cid) { const c = CARS.find(x => x.id === cid); if (!c) return null; if (!c.baseImg) c.baseImg = c.trim.img; const k = KITS[cid]; return k && save.kit && save.kit[cid] === 'on' && PHOTOS[k.img] ? k.img : c.baseImg; }
+function kitImg(cid) { const c = CARS.find(x => x.id === cid); if (!c) return null; if (!c.baseImg) c.baseImg = c.trim.img; c.trim.baseImg = c.baseImg; const k = KITS[cid]; if (k && PHOTOS[k.img]) { carImg(k.img); carImg(c.baseImg); } /* start loading both looks early */ return k && save.kit && save.kit[cid] === 'on' && PHOTOS[k.img] ? k.img : c.baseImg; }
 function gtOf(cid) { const c = CARS.find(x => x.id === cid), lv = save.gt && save.gt[cid] || 0; return c && c.trim && c.trim.img && lv > 0 ? { key: c.trim.img, lv } : null; }
 function glassTintImg(key, lv) {
   const ck = key + ':' + lv; if (GLASSC[ck]) return GLASSC[ck];
@@ -5808,7 +5808,7 @@ function gExtras(g, L, color, stripe) {
   if (g.c) { ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = Math.max(1, L * 0.004); ctx.beginPath(); ctx.moveTo(U(g.l[0] + 0.08), Z(g.rail)); ctx.lineTo(U(g.l[0] + 0.08), Z(0.5)); ctx.stroke(); }
 }
 function drawCar(r, base, sc, color, roof, glowRgb, stripe, wst, trim) {
-  const G = trim && trim.g, Lm = (trim && trim.len) || (G ? G.l[1] - G.l[0] : 4.4), IM0 = trim && trim.img ? carImg(trim.img) : null, IM = IM0 && (trim.tint || trim.brush) ? paintCar(trim.img, trim.tint, trim.brush, IM0) : IM0;
+  const G = trim && trim.g, Lm = (trim && trim.len) || (G ? G.l[1] - G.l[0] : 4.4), IMK = trim && trim.img ? (carImg(trim.img) ? trim.img : trim.baseImg && carImg(trim.baseImg) ? trim.baseImg : null) : null, IM0 = IMK ? carImg(IMK) : null, IM = IM0 && (trim.tint || trim.brush) ? paintCar(IMK, trim.tint, trim.brush, IM0) : IM0; /* while a body kit sprite loads, keep showing the stock body instead of the drawn fallback */
   const L = Lm * ppm * sc, x0 = (r.x - Lm - camX) * ppm;
   if (x0 > W + 40 || x0 + L < -40) return;
   const ro = roof || 1;
@@ -5824,7 +5824,7 @@ function drawCar(r, base, sc, color, roof, glowRgb, stripe, wst, trim) {
   r._pt = (r._pt || 0) + (pTarget - (r._pt || 0)) * 0.1;
   const pitch = r._pt;
   ctx.save(); ctx.translate(0.2 * L, -0.075 * L); ctx.rotate(-pitch); ctx.translate(-0.2 * L, 0.075 * L);
-  if (IM) { drawPhoto(IM, PHOTOS[trim.img], r, L, trim.wp, trim.ws, trim.dr, trim.rh, trim.gt, trim.cc); ctx.restore(); } else {
+  if (IM) { drawPhoto(IM, PHOTOS[IMK], r, L, trim.wp, trim.ws, trim.dr, trim.rh, trim.gt, trim.cc); ctx.restore(); } else {
   let hr = 0.335 * ro;
   let body = new Path2D();
   let win = null, wx1 = 0.2 * L, wx2 = 0.8 * L, wyy = 0.078 * L, wrr = 0.078 * L, wellR = 0.092 * L, wellY = 0.075 * L;
@@ -5885,7 +5885,7 @@ function drawCar(r, base, sc, color, roof, glowRgb, stripe, wst, trim) {
   }
 
   ctx.globalCompositeOperation = 'lighter';
-  const lampY = IM ? PHOTOS[trim.img].ar * L * 0.46 : 0.15 * L, lampF = IM ? 0.968 : 0.99;
+  const lampY = IM ? PHOTOS[IMK].ar * L * 0.46 : 0.15 * L, lampF = IM ? 0.968 : 0.99;
   glow(0.03 * L, -lampY, L * (r.finished ? 0.16 : 0.1), '255,40,40', r.finished ? 0.9 : 0.6);
   const hb = ctx.createLinearGradient(L * lampF, 0, L * 1.9, 0); hb.addColorStop(0, 'rgba(255,240,200,.22)'); hb.addColorStop(1, 'rgba(255,240,200,0)');
   ctx.fillStyle = hb; ctx.beginPath(); ctx.moveTo(L * lampF, -lampY); ctx.lineTo(L * 1.9, -lampY - 0.09 * L); ctx.lineTo(L * 1.9, -lampY + 0.13 * L); ctx.closePath(); ctx.fill();
