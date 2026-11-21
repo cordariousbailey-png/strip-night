@@ -4703,7 +4703,8 @@ function chopScene(cv) {
    and when online is set up it also uploads to Firebase so other players can race it. Racing a ghost replays that real run in lane 2.
    Firebase is reached through its REST API (no SDK). Fill in FIREBASE_CFG after creating the Firebase project; until then the Online
    tab still lets you race your own ghosts. */
-const FIREBASE_CFG = { apiKey: '', projectId: '' };
+/* Firebase web config: the API key only identifies the project; access is controlled by firestore.rules */
+const FIREBASE_CFG = { apiKey: 'AIzaSyACYtXgvfzAHybubCT0sQ5uiPs5GfRpyyY', projectId: 'strip-night' };
 const OL_ON = () => !!(FIREBASE_CFG.apiKey && FIREBASE_CFG.projectId);
 const GHOST_V = 1;
 let GHOST = null;

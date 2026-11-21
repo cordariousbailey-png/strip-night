@@ -1,0 +1,22 @@
+// Live check of the online ghost-race backend, using the same REST calls as the game.
+const KEY = 'AIzaSyACYtXgvfzAHybubCT0sQ5uiPs5GfRpyyY', PID = 'strip-night';
+const base = `https://firestore.googleapis.com/v1/projects/${PID}/databases/(default)/documents`;
+const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1; };
+const su = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
+const sj = await su.json(); ok(su.ok && sj.localId, 'anonymous sign-in ' + su.status + (sj.error ? ' ' + sj.error.message : ''));
+if (!su.ok) process.exit(1);
+const H = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sj.idToken };
+const tr = Array.from({ length: 40 }, (_, i) => [i / 30, i * 0.5, i, 3000 + i * 50, 1, 0, 0]);
+const data = { v: 1, name: 'CheckBot', cls: 'test', et: 12.345, mph: 110.2, rt: 0.05, fc: 12.3, lr: 4000, eng: 'x', voice: 'v8', snd: {}, nos: false, carName: 'Test Car', look: {}, mk: { 1320: [12.345, 110.2] } };
+const fields = { name: { stringValue: 'CheckBot' }, et: { doubleValue: 12.345 }, mph: { doubleValue: 110.2 }, carName: { stringValue: 'Test Car' }, data: { stringValue: JSON.stringify(data) }, tr: { stringValue: JSON.stringify(tr) }, at: { timestampValue: new Date().toISOString() } };
+const up = await fetch(`${base}/ghosts_test/${sj.localId}`, { method: 'PATCH', headers: H, body: JSON.stringify({ fields }) });
+ok(up.ok, 'upload own ghost ' + up.status + (up.ok ? '' : ' ' + (await up.text()).slice(0, 200)));
+const bad = await fetch(`${base}/ghosts_test/someone_else`, { method: 'PATCH', headers: H, body: JSON.stringify({ fields }) });
+ok(bad.status === 403, 'writing someone else\'s ghost is blocked (' + bad.status + ')');
+const cheat = await fetch(`${base}/ghosts_test/${sj.localId}`, { method: 'PATCH', headers: H, body: JSON.stringify({ fields: { ...fields, et: { doubleValue: 1.2 } } }) });
+ok(cheat.status === 403, 'impossible 1.2 s time is blocked (' + cheat.status + ')');
+const q = await fetch(`${base}:runQuery`, { method: 'POST', headers: H, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'ghosts_test' }], orderBy: [{ field: { fieldPath: 'et' }, direction: 'ASCENDING' }], limit: 60 } }) });
+const rows = q.ok ? await q.json() : []; const mine = rows.find(r => r.document && r.document.name.endsWith('/' + sj.localId));
+ok(q.ok && mine, 'leaderboard query returns the ghost ' + q.status);
+const del = await fetch(`${base}/ghosts_test/${sj.localId}`, { method: 'DELETE', headers: H });
+ok(del.ok, 'clean up test ghost ' + del.status);
