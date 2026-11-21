@@ -1,8 +1,6 @@
 name: Firebase online check
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/firebase-live]
 jobs:
   check:
     runs-on: ubuntu-latest
