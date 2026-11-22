@@ -20,3 +20,33 @@ const rows = q.ok ? await q.json() : []; const mine = rows.find(r => r.document 
 ok(q.ok && mine, 'leaderboard query returns the ghost ' + q.status);
 const del = await fetch(`${base}/ghosts_test/${sj.localId}`, { method: 'DELETE', headers: H });
 ok(del.ok, 'clean up test ghost ' + del.status);
+
+// ---- live pink slips ----
+async function anon() { const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) }); const j = await r.json(); return { uid: j.localId, H: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + j.idToken } }; }
+const S = v => ({ stringValue: v }), T = d => ({ timestampValue: d.toISOString() });
+const A = { uid: sj.localId, H }, B = await anon(), C = await anon();
+const code = 'Z' + Math.random().toString(36).slice(2, 5).toUpperCase().replace(/[^A-Z]/g, 'Q');
+const qu = await fetch(`${base}/pq_test/${A.uid}`, { method: 'PATCH', headers: A.H, body: JSON.stringify({ fields: { name: S('CheckBot'), cid: S('fk8'), carName: S('Vector R'), car: S('{}'), at: T(new Date()) } }) });
+ok(qu.ok, 'join pink slip queue ' + qu.status);
+const qbad = await fetch(`${base}/pq_test/${B.uid}`, { method: 'PATCH', headers: A.H, body: JSON.stringify({ fields: { name: S('x'), cid: S('fk8'), carName: S('x'), car: S('{}'), at: T(new Date()) } }) });
+ok(qbad.status === 403, 'queueing as someone else is blocked (' + qbad.status + ')');
+const mk = await fetch(`${base}/pm/${code}?currentDocument.exists=false`, { method: 'PATCH', headers: A.H, body: JSON.stringify({ fields: { a: S(A.uid), b: S(''), an: S('CheckBot'), bn: S(''), ac: S('{}'), bc: S(''), cls: S('test'), st: S('open'), code: { booleanValue: true }, treeAt: T(new Date(Date.now() + 600000)) } }) });
+ok(mk.ok, 'host a friend code ' + mk.status);
+const mask = ks => ks.map(k => 'updateMask.fieldPaths=' + k).join('&');
+const join = await fetch(`${base}/pm/${code}?${mask(['b', 'bn', 'bc', 'st'])}`, { method: 'PATCH', headers: B.H, body: JSON.stringify({ fields: { b: S(B.uid), bn: S('Joiner'), bc: S('{}'), st: S('joined') } }) });
+ok(join.ok, 'friend joins with the code ' + join.status);
+const steal = await fetch(`${base}/pm/${code}?${mask(['b', 'st'])}`, { method: 'PATCH', headers: C.H, body: JSON.stringify({ fields: { b: S(C.uid), st: S('joined') } }) });
+ok(steal.status === 403, 'a third player cannot take the spot (' + steal.status + ')');
+const go = await fetch(`${base}/pm/${code}?${mask(['st', 'treeAt'])}`, { method: 'PATCH', headers: A.H, body: JSON.stringify({ fields: { st: S('ready'), treeAt: T(new Date(Date.now() + 20000)) } }) });
+ok(go.ok, 'host starts the race ' + go.status);
+const run = await fetch(`${base}/pm/${code}/r/${B.uid}`, { method: 'PATCH', headers: B.H, body: JSON.stringify({ fields: { rt: { doubleValue: 0.1 }, tr: S('[]'), done: { booleanValue: false } } }) });
+ok(run.ok, 'racer streams their run ' + run.status);
+const fake = await fetch(`${base}/pm/${code}/r/${B.uid}`, { method: 'PATCH', headers: A.H, body: JSON.stringify({ fields: { rt: { doubleValue: 0.1 }, tr: S('[]'), done: { booleanValue: true }, quit: { booleanValue: true } } }) });
+ok(fake.status === 403, 'nobody can write the other racer\'s run (' + fake.status + ')');
+const rd = await fetch(`${base}/pm/${code}/r/${B.uid}`, { headers: A.H });
+ok(rd.ok, 'host reads the friend\'s run ' + rd.status);
+const qq = await fetch(`${base}:runQuery`, { method: 'POST', headers: B.H, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'pm' }], where: { fieldFilter: { field: { fieldPath: 'b' }, op: 'EQUAL', value: S(B.uid) } }, limit: 10 } }) });
+ok(qq.ok, 'match lookup query ' + qq.status);
+await fetch(`${base}/pm/${code}/r/${B.uid}`, { method: 'DELETE', headers: B.H });
+const dm = await fetch(`${base}/pm/${code}`, { method: 'DELETE', headers: A.H }); ok(dm.ok, 'clean up match ' + dm.status);
+const dq = await fetch(`${base}/pq_test/${A.uid}`, { method: 'DELETE', headers: A.H }); ok(dq.ok, 'clean up queue ' + dq.status);
