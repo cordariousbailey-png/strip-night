@@ -1,22 +1,62 @@
 rules_version = '2';
-// Strip Night ghost races. Anyone signed in (anonymous is fine) can read ghosts.
-// A player can only write their own ghost (document id = their user id), one per race class,
-// and only in the expected shape and size.
+// Strip Night online play. Everyone must be signed in (anonymous is fine).
+//  ghosts_<class>/<uid>   best runs for ghost races and leaderboards
+//  pq_<class>/<uid>       pink slip quick-match queue
+//  pm/<id>                a pink slip match between two players
+//  pm/<id>/r/<uid>        each player's live run in that match
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{col}/{uid} {
-      allow read: if col.matches('ghosts_[a-z0-9]+') && request.auth != null;
-      allow create, update: if col.matches('ghosts_[a-z0-9]+')
-        && request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['name', 'et', 'mph', 'carName', 'data', 'tr', 'at'])
-        && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 16
-        && request.resource.data.et is number && request.resource.data.et > 3 && request.resource.data.et < 40
-        && request.resource.data.mph is number
-        && request.resource.data.carName is string && request.resource.data.carName.size() <= 40
-        && request.resource.data.data is string && request.resource.data.data.size() < 8000
-        && request.resource.data.tr is string && request.resource.data.tr.size() < 120000
-        && request.resource.data.at is timestamp;
-      allow delete: if request.auth != null && request.auth.uid == uid;
+    function signedIn() { return request.auth != null; }
+    function ghostOk(uid) {
+      let d = request.resource.data;
+      return request.auth.uid == uid
+        && d.keys().hasOnly(['name', 'et', 'mph', 'carName', 'data', 'tr', 'at'])
+        && d.name is string && d.name.size() >= 3 && d.name.size() <= 16
+        && d.et is number && d.et > 3 && d.et < 40
+        && d.mph is number
+        && d.carName is string && d.carName.size() <= 40
+        && d.data is string && d.data.size() < 8000
+        && d.tr is string && d.tr.size() < 120000
+        && d.at is timestamp;
+    }
+    function queueOk(uid) {
+      let d = request.resource.data;
+      return request.auth.uid == uid
+        && d.keys().hasOnly(['name', 'cid', 'carName', 'car', 'at'])
+        && d.name is string && d.name.size() <= 16
+        && d.car is string && d.car.size() < 20000
+        && d.at is timestamp;
+    }
+    function matchCreateOk() {
+      let d = request.resource.data;
+      return d.a == request.auth.uid && d.b is string && d.ac is string && d.ac.size() < 20000
+        && d.bc is string && d.bc.size() < 20000 && d.cls is string && d.treeAt is timestamp;
+    }
+    function matchUpdateOk() {
+      let d = request.resource.data;
+      return d.a == resource.data.a && d.ac == resource.data.ac && d.cls == resource.data.cls
+        && (request.auth.uid == resource.data.a
+            || request.auth.uid == resource.data.b
+            || (resource.data.b == '' && d.b == request.auth.uid && d.bc is string && d.bc.size() < 20000));
+    }
+
+    match /{col}/{id} {
+      allow read: if signedIn() && (col.matches('ghosts_[a-z0-9]+') || col.matches('pq_[a-z0-9]+') || col == 'pm');
+      allow create, update: if signedIn() && (
+        (col.matches('ghosts_[a-z0-9]+') && ghostOk(id))
+        || (col.matches('pq_[a-z0-9]+') && queueOk(id))
+        || (col == 'pm' && request.method == 'create' && matchCreateOk())
+        || (col == 'pm' && request.method == 'update' && matchUpdateOk()));
+      allow delete: if signedIn() && (
+        (!(col == 'pm') && request.auth.uid == id)
+        || (col == 'pm' && request.auth.uid in [resource.data.a, resource.data.b]));
+
+      match /r/{uid} {
+        allow read: if signedIn() && col == 'pm';
+        allow create, update: if signedIn() && col == 'pm' && request.auth.uid == uid
+          && request.resource.data.tr is string && request.resource.data.tr.size() < 150000;
+        allow delete: if signedIn() && request.auth.uid == uid;
+      }
     }
   }
 }

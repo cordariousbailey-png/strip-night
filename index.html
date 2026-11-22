@@ -827,6 +827,21 @@ body, #app { background:#08080e; }
 .kitb { min-height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid var(--line); background: #0d1020; color: #e8e2ff; font: 800 12px var(--f-body); letter-spacing: .06em; text-transform: uppercase; }
 .kitb[aria-pressed="true"] { border-color: var(--sodium); color: #fff; }
 .kitb:disabled { opacity: .45; }
+/* pink slips tab */
+.pkcard { text-align: center; }
+.pkthumb { display: block; width: 100%; max-width: 360px; height: auto; margin: 4px auto; }
+.pkcard .gn { font: 900 20px var(--f-body); color: #fff; }
+.pkcard .gc { font: 600 12px var(--f-mono); color: #b9a8ff; margin-top: 2px; }
+.pkchecks { list-style: none; margin: 4px 0 10px; padding: 0; }
+.pkchecks li { display: flex; gap: 10px; align-items: center; padding: 6px 2px; font: 700 13px var(--f-body); color: #e8e2ff; }
+.pkchecks li.no { color: #a99fc8; }
+.pkchecks .i { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; background: #1d3b2c; color: #37f08a; flex: none; }
+.pkchecks li.no .i { background: #3a1830; color: #ff6b8a; }
+.pkrow { display: flex; gap: 8px; margin: 0 0 8px; }
+.pkrow .pkbtn { flex: 1; }
+.pkbtn { white-space: normal; line-height: 1.2; padding: 8px 12px; }
+.pkcode { margin: 6px 0 10px; text-align: center; font: 900 44px var(--f-mono); letter-spacing: .3em; color: #ffd0e6; text-shadow: 0 0 18px rgba(255,79,163,.6); }
+.pkmsg { color: #ffd0e6; }
 /* online tab */
 .olcard { padding: 12px; margin: 0 0 12px; border-radius: 12px; background: #120f22; border: 1px solid #2c2550; }
 .olh { font: 800 12px var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: #b9a8ff; margin-bottom: 8px; }
@@ -1143,6 +1158,7 @@ body.burning .dock .inner { grid-template-columns: 1.15fr .85fr 1.15fr; }
     <section class="sec" data-gt="events"><h2>Events</h2><div class="stat-line" id="dailyCard"></div><div class="stat-line" id="amCard"></div>
       <p class="note">New challenges every day. Beat more rivals to unlock more events.</p></section>
     <section class="sec" data-gt="online" id="onlineSec"><h2>Online</h2><p class="lede">Race the ghosts of real players: their actual runs, replayed in lane 2.</p><div id="onlineList"></div></section>
+    <section class="sec" data-gt="pinks" id="pinksSec"><h2>Pink slips</h2><p class="lede">Race a real player live. Winner takes the loser's car.</p><div id="pinksList"></div></section>
     <section class="sec" data-gt="owned"><h2>My garage</h2><div class="ups" id="ownList"></div>
       <p class="note">Each car keeps its own parts, tune and paint. Sell a car from its card to free a slot.</p>
     </section>
@@ -2057,6 +2073,30 @@ class GhostRacer extends Racer {
     if (!this.finished && i >= n - 1) { this.finished = true; this.finishClock = this.g.fc; if (!this.marks[1320]) this.marks[1320] = { t: this.g.mk[1320][0], v: this.g.mk[1320][1] }; }
   }
 }
+/* live pink slips: lane 2 follows the other player's run as it streams in, and fills the gaps by holding their last speed */
+class LiveRacer extends GhostRacer {
+  step(dt) {
+    if (this.g.done) return super.step(dt);
+    if (this.mode !== 'run') return;
+    this.tl = Math.max(this.tl + dt, (this.liveNow || 0) - (this.g.rt || 0)); this.clock = this.tl; if (this.flame > 0) this.flame -= dt;
+    const T = this.g.tr, n = T.length; if (!n) return;
+    let i = this.gi; while (i < n - 1 && T[i + 1][0] <= this.tl) i++;
+    this.gi = i; const a = T[i];
+    let tx, tv;
+    if (i < n - 1 && this.tl >= a[0]) { const b = T[i + 1], f = Math.max(0, Math.min(1, (this.tl - a[0]) / Math.max(1e-6, b[0] - a[0]))); tx = a[1] + (b[1] - a[1]) * f; tv = a[2] + (b[2] - a[2]) * f; this.rpm = a[3] + (b[3] - a[3]) * f; }
+    else {
+      /* past their latest sample: carry on with their recent acceleration */
+      let j = i; while (j > 0 && a[0] - T[j][0] < 0.25) j--;
+      const acc = j < i ? Math.max(0, Math.min(15, (a[2] - T[j][2]) / Math.max(1e-3, a[0] - T[j][0]))) : 0;
+      const e = Math.max(0, Math.min(1.6, this.tl - a[0])); tv = a[2] + acc * e; tx = a[1] + a[2] * e + 0.5 * acc * e * e; this.rpm = a[3];
+    }
+    /* ease toward fresh data instead of jumping, and never roll backwards */
+    const gap = tx - this.x; this.x = gap > 0 ? this.x + gap * Math.min(1, dt * 6) : this.x + Math.max(gap, -tv * dt * 0.5);
+    this.v = tv;
+    if (a[4] > this.gear) this.flame = 0.25;
+    this.gear = a[4]; this.nos = a[5] ? 1 : 0; this.spin = !!a[6];
+  }
+}
 // ==SIM-END==
 
 /* ---------- data ---------- */
@@ -2210,7 +2250,7 @@ function settleSlip(win) {
   const st = slipStake(); if (!st) return null;
   save.slipStake = null;
   if (win) {
-    if (!garageFull()) { save.ownedCars.push(st.id); save.cars[st.id] = freshBuild(st); markFab(st.id, st.eng); if (!save.owned.includes(st.eng)) save.owned.push(st.eng); return { won: st.name }; }
+    if (!garageFull()) { save.ownedCars.push(st.id); (save.carAt = save.carAt || {})[st.id] = Date.now(); save.cars[st.id] = freshBuild(st); markFab(st.id, st.eng); if (!save.owned.includes(st.eng)) save.owned.push(st.eng); return { won: st.name }; }
     const cash = Math.round((st.price || 0) * 0.75 / 50) * 50; save.cash += cash; return { cash, name: st.name };
   }
   const lost = save.car, lc = CARS.find(x => x.id === lost);
@@ -2576,6 +2616,7 @@ function newRace() {
   opp.target = opp.idealRpm() + (Math.random() - 0.5) * 2 * r.acc * TN.acc; lcAdj = 1; goArmed = false;
   player.trace = [];
   if (GHOST) opp = ghostRacer(GHOST);
+  else if (LIVE && !LIVE.ending) opp = liveRacer();
   particles.length = 0;
   raceT = 0; finT = 0;
 }
@@ -3572,7 +3613,7 @@ function startRaceNow() {
   audioStart(); AU.purged = false; AU.stage = 0; sfxStart();
   newRace();
   { const nn = AMS() ? 'none' : ''; $('btnNos').style.display = nn; $('btnScr').style.display = nn; }
-  { const rd = GHOST ? GHOST.look.dr : (rivalTrim(RIVALS[save.rival]) || {}).dr || 'r'; opp._dr = rd; opp.boDelay = 0.25 + Math.random() * 0.5; opp.boDur = rd === 'a' ? 1.2 : 1.8 + Math.random() * 1.1; opp.boT = 0; opp._bo = false; }
+  { const rd = GHOST ? GHOST.look.dr : LIVE ? LIVE.g.look.dr : (rivalTrim(RIVALS[save.rival]) || {}).dr || 'r'; opp._dr = rd; opp.boDelay = 0.25 + Math.random() * 0.5; opp.boDur = rd === 'a' ? 1.2 : 1.8 + Math.random() * 1.1; opp.boT = 0; opp._bo = false; }
   phase = 'burnout'; phaseT = 0;
   $('garage').hidden = true; $('slipSheet').hidden = true;
   setGo('Launch', 'hold, release on green'); goArmed = false; $('btnGo').classList.remove('on');
@@ -3616,6 +3657,7 @@ function enterStage() {
 function showGarage() {
   const wasPhase = phase; syncWear(); burnUI(false); /* ads only ever show after a finished race, never when the garage is opened mid-race */
   if (replay) stopReplay();
+  if (LIVE && !LIVE.ending) { LIVE = null; PK.st = 'idle'; pkBoot(); }
   phase = 'garage'; coachOff(); GHOST = null; newRace(); setGas(false); goArmed = false; $('btnGo').classList.remove('on');
   $('garage').hidden = false; renderGarage(); $('slipSheet').hidden = true; setHint(''); if (wasPhase === 'done') maybeInterstitial();
   if (PEND_UNL) { const L = PEND_UNL; PEND_UNL = null; setTimeout(() => { if (!$('garage').hidden) unlockReveal(L); }, 500); }
@@ -3668,6 +3710,7 @@ const tbHold = () => save.tb > 0 && goArmed && (phase === 'stage' || phase === '
 function update(h) {
   if (phase === 'garage' || phase === 'done') return;
   phaseT += h;
+  if (LIVE) liveTick(h);
   rivalBurn(h);
   if (bn.P && phase !== 'burnout' && player) { BURN.tick(bn.P, bn.S, h, phase === 'run' && player.mode === 'run' ? player.slipW : 0, phase === 'run' ? player.v : 0); burnTg(); }
   if (phase !== 'foul') coachTick();
@@ -3682,7 +3725,7 @@ function update(h) {
   if (phase === 'burnout') {
     burnUpdate(h);
   } else if (phase === 'stage') {
-    if (phaseT >= treeWait) { phase = 'tree'; phaseT = 0; treeT = 0; beep(620, 0.12); setHint('Keep the needle on the marker. Release GO on green.'); coach('Tutorial 3 of 5', 'Release GO on GREEN', 'Watch the lights. Let go the instant the green comes on. Too early is a red light.', ['btnGo']); }
+    if (LIVE && !LIVE.ending ? srvNow() >= LIVE.treeAt : phaseT >= treeWait) { phase = 'tree'; phaseT = 0; treeT = 0; beep(620, 0.12); setHint('Keep the needle on the marker. Release GO on green.'); coach('Tutorial 3 of 5', 'Release GO on GREEN', 'Watch the lights. Let go the instant the green comes on. Too early is a red light.', ['btnGo']); }
   } else if (phase === 'tree') {
     treeT += h;
     const before = Math.floor((treeT - h) / 0.5), now = Math.floor(treeT / 0.5);
@@ -3819,6 +3862,7 @@ function confetti() {
     if (t < 2.1) requestAnimationFrame(f); else c.remove(); })(t0);
 }
 function endRace(wasFoul) {
+  if (LIVE && !LIVE.ending) { liveEnd(wasFoul); return; }
   if (GHOST) { ghostEnd(wasFoul); return; }
   syncWear(); burnUI(false); phase = 'done'; setGas(false); setHint(''); setTimeout(sfxShutdown, 900); if (tutOn() && !wasFoul) { save.seen.tut = 1; persist(); } coachOff(); coachKey = '';
   const rv = RIVALS[save.rival], rvIdx = save.rival, mu = MU || { kind: 'even', off: 0 };
@@ -3931,7 +3975,7 @@ const GICON = {
 };
 /* four main sections; every old garage tab is now a sub-tab (a "leaf") so gTab and goTab() keep their old meaning */
 const GGROUPS = [
-  { id: 'race', label: 'Race', leaves: [['race', 'Rivals'], ['events', 'Events'], ['online', 'Online'], ['career', 'Career']] },
+  { id: 'race', label: 'Race', leaves: [['race', 'Rivals'], ['events', 'Events'], ['online', 'Online'], ['pinks', 'Pinks'], ['career', 'Career']] },
   { id: 'garage', label: 'Garage', leaves: [['owned', 'My cars']] },
   { id: 'build', label: 'Build', leaves: [['shop', 'Upgrades'], ['engines', 'Engine'], ['dyno', 'Dyno'], ['looks', 'Paint']] },
   { id: 'market', label: 'Market', leaves: [['cars', 'Dealership'], ['market', 'Black Market'], ['store', 'Store']] }
@@ -4047,7 +4091,7 @@ function renderGarage() {
   PD = playerDesc();
   const MUS = RIVALS.map((r, i) => matchup(PD, i)), okAt = i => unlocked(i) && MUS[i].kind !== 'out';
   if (!okAt(save.rival)) { let best = -1, bd = 1e9; RIVALS.forEach((r, i) => { if (i < NREAL && okAt(i) && Math.abs(PD.et - r.est) < bd) { bd = Math.abs(PD.et - r.est); best = i; } }); if (best >= 0) { save.rival = best; persist(); } }
-  renderClass(); renderDaily(); renderAM(); renderStore(); try { renderOnline(); } catch (_) {}
+  renderClass(); renderDaily(); renderAM(); renderStore(); try { renderOnline(); } catch (_) {} try { renderPinks(); } catch (_) {}
   $('cash').textContent = money(save.cash);
   const L = $('rivalList'); L.textContent = '';
   { const b = document.createElement('button'), R = RIVALS[NREAL], on = isStreet(); b.type = 'button'; b.className = 'rival street' + (on ? ' sel' : ''); b.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -4159,7 +4203,7 @@ function renderCars() {
     b.onclick = () => {
       if (!owned) {
         if (!open || save.cash < c.price || garageFull()) return;
-        save.cash -= c.price; save.ownedCars.push(c.id); save.cars[c.id] = freshBuild(c); markFab(c.id, c.eng);
+        save.cash -= c.price; save.ownedCars.push(c.id); (save.carAt = save.carAt || {})[c.id] = Date.now(); save.cars[c.id] = freshBuild(c); markFab(c.id, c.eng);
         if (!save.owned.includes(c.eng)) save.owned.push(c.eng);
       }
       switchCar(c.id);
@@ -4751,13 +4795,14 @@ function ghostFromPlayer() {
   return cleanGhost({ name: olName() || 'You', cls: PD && PD.cls ? PD.cls.id : '', et: p.marks[1320].t, mph: p.marks[1320].v, rt: p.t0, fc: p.finishClock, lr: p.launchRpm || 4000,
     eng: p.eng.id, voice: p.eng.voice || p.eng.id, snd: p.eng.snd, nos: p.nosLeft < p.nosShots, tr: p.trace, mk, look, carName: c.name, me: true });
 }
-function ghostTrim() {
-  if (GHOST._tr) return GHOST._tr;
-  const L = GHOST.look, c = CARS.find(x => x.id === L.car) || CARS[0];
-  return GHOST._tr = Object.assign({}, c.trim, { img: c.baseImg || c.trim.img, tint: L.tint, brush: null, rh: L.rh, wp: L.wp, dr: L.dr, ws: L.ws, cc: L.cc, gt: L.gt });
+function ghostTrim(G) {
+  G = G || GHOST; if (G._tr) return G._tr;
+  const L = G.look, c = CARS.find(x => x.id === L.car) || CARS[0];
+  return G._tr = Object.assign({}, c.trim, { img: c.baseImg || c.trim.img, tint: L.tint, brush: null, rh: L.rh, wp: L.wp, dr: L.dr, ws: L.ws, cc: L.cc, gt: L.gt });
 }
 function drawOpp(o, base) {
-  if (GHOST) { const L = GHOST.look; drawCar(o, base, 0.88, L.paint, L.roof, L.glow, L.stripe, L.wheels, ghostTrim()); return; }
+  const G = GHOST || (LIVE && LIVE.g);
+  if (G) { const L = G.look; drawCar(o, base, 0.88, L.paint, L.roof, L.glow, L.stripe, L.wheels, ghostTrim(G)); return; }
   const rvl = RIVALS[save.rival]; drawCar(o, base, 0.88, rvl.color, rvl.roof, '255,200,120', null, 0, rivalTrim(rvl));
 }
 /* keep your best run per class on this phone; upload it when online is on */
@@ -4918,6 +4963,277 @@ function ghostEnd(wasFoul) {
   try { resultFx({ win, foul: wasFoul, dead: !wasFoul && !!player.blown, margin, prize: wasFoul ? 0 : prize, rv: { name: G.me ? 'your ghost' : G.name } }); } catch (_) {}
 }
 
+/* ---------- live pink slips ----------
+   Two real players race at the same moment for each other's cars. There is no game server (Firebase's free plan),
+   so the two phones coordinate through Firestore:
+     pq_<class>/<uid>   quick-match queue entry, with the car you're betting
+     pm/<id>            a match: both players, both cars, and the moment the tree drops (server time)
+     pm/<id>/r/<uid>    each player's run, streamed about once a second and then finalised
+   Both phones work out the winner from the same two final runs, so they always agree. A player who leaves
+   mid-race loses: their phone forfeits the car the next time the game opens, and the other phone wins by timeout. */
+const PK = { off: 0, rtt: 1e9, st: 'idle', msg: '', code: '', match: null, timer: 0, confirm: '', joinIn: '' };
+let LIVE = null;
+const PK_DAY = 24 * 3600 * 1000;
+const srvNow = () => Date.now() + PK.off;
+const fsEnc = v => v === null || v === undefined ? { nullValue: null } : typeof v === 'boolean' ? { booleanValue: v } : typeof v === 'number' ? { doubleValue: v } : v instanceof Date ? { timestampValue: v.toISOString() } : { stringValue: String(v) };
+const fsFields = o => { const f = {}; Object.keys(o).forEach(k => { f[k] = fsEnc(o[k]); }); return f; };
+function fsDec(f) { const o = {}; Object.keys(f || {}).forEach(k => { const v = f[k]; o[k] = 'stringValue' in v ? v.stringValue : 'doubleValue' in v ? v.doubleValue : 'integerValue' in v ? +v.integerValue : 'booleanValue' in v ? v.booleanValue : 'timestampValue' in v ? Date.parse(v.timestampValue) : null; }); return o; }
+function pkClock(t0, t1, iso) { const rtt = t1 - t0, s = Date.parse(iso); if (!isFinite(s)) return; if (rtt <= PK.rtt * 1.5 || rtt < 400) { PK.off = s - (t0 + t1) / 2; PK.rtt = Math.min(PK.rtt, rtt); } }
+async function fsReq(method, path, body, qs) {
+  const a = await olAuth(), t0 = Date.now();
+  const r = await fetch(fsBase() + path + (qs ? '?' + qs : ''), { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.idToken }, body: body ? JSON.stringify(body) : undefined });
+  const t1 = Date.now(); let j = null; try { j = await r.json(); } catch (_) {}
+  if (j && j.updateTime) pkClock(t0, t1, j.updateTime);
+  return { ok: r.ok, status: r.status, j };
+}
+const fsPut = (path, obj, extraQs) => fsReq('PATCH', '/' + path, { fields: fsFields(obj) }, extraQs);
+const fsSet = (path, obj) => fsReq('PATCH', '/' + path, { fields: fsFields(obj) }, Object.keys(obj).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&'));
+async function fsGet(path) { const r = await fsReq('GET', '/' + path); return r.ok && r.j && r.j.fields ? fsDec(r.j.fields) : null; }
+const fsDel = path => fsReq('DELETE', '/' + path).catch(() => {});
+async function fsQuery(col, where, order, limit) {
+  const q = { from: [{ collectionId: col }], limit: limit || 20 };
+  if (where) q.where = { fieldFilter: { field: { fieldPath: where[0] }, op: 'EQUAL', value: fsEnc(where[1]) } };
+  if (order) q.orderBy = [{ field: { fieldPath: order }, direction: 'ASCENDING' }];
+  const r = await fsReq('POST', ':runQuery', { structuredQuery: q });
+  return r.ok && Array.isArray(r.j) ? r.j.filter(x => x.document).map(x => Object.assign(fsDec(x.document.fields), { _id: x.document.name.split('/').pop() })) : [];
+}
+
+/* what's on the line: the car you're driving, its whole build and looks */
+const PK_COS = ['tints', 'kit', 'rimSz', 'calColor', 'gt', 'wheelsP', 'gloss', 'rh', 'eb'];
+function pkBlob() {
+  const c = curCar(), cos = {}, g = ghostFromPlayerLook();
+  PK_COS.forEach(k => { if (save[k] && typeof save[k] === 'object' && save[k][c.id] !== undefined) cos[k] = save[k][c.id]; });
+  return JSON.stringify({ cid: c.id, name: c.name, build: pickBuild(), cos, look: g.look, eng: save.eng, voice: g.voice, snd: g.snd, nos: save.nos > 0, lr: 4000 });
+}
+function ghostFromPlayerLook() {
+  const c = curCar(), e = ENGINES.find(x => x.id === save.eng) || ENGINES[0];
+  return { look: { car: save.car, paint: save.paint, stripe: save.stripe, glow: save.glow, roof: BODIES[save.body] ? BODIES[save.body].roof : 1, wheels: save.wheels, tint: tintSpec(save.car), rh: rhOf(save.car), wp: wheelP(save.car), ws: wheelSz(save.car), dr: DRV(c.drive), cc: calOf(save.car), gt: gtOf(save.car) }, voice: e.voice || e.id, snd: e.snd };
+}
+function pkParse(s) { try { const b = JSON.parse(s); return b && CARS.find(c => c.id === b.cid) ? b : null; } catch (_) { return null; } }
+
+/* who may race for pinks */
+function pkChecks() {
+  const c = curCar(), at = save.carAt && save.carAt[c.id], age = at ? Date.now() - at : Infinity;
+  return [
+    ['Online racer name set', !!olName()],
+    ['You own 2 or more cars', save.ownedCars.length >= 2],
+    ['Room in your garage for their car', !garageFull()],
+    [c.name + ' owned for 24 hours' + (age < PK_DAY ? ' (' + Math.ceil((PK_DAY - age) / 3600000) + ' h left)' : ''), age >= PK_DAY]
+  ];
+}
+const pkCls = () => (PD && PD.cls ? PD.cls.id : (playerDesc().cls || {}).id || 'x').replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+/* ---- matchmaking ---- */
+function pkStop(msg) { clearTimeout(PK.timer); PK.timer = 0; const a = OL.auth; if (a && PK.st === 'queue') fsDel('pq_' + pkCls() + '/' + a.uid); if (a && PK.st === 'host' && PK.code) fsDel('pm/' + PK.code); PK.st = 'idle'; PK.code = ''; PK.match = null; PK.msg = msg || ''; pkRender(); }
+async function pkQuick() {
+  try {
+    const a = await olAuth(), cls = pkCls();
+    PK.st = 'queue'; PK.msg = 'Looking for a racer in your class…'; pkRender();
+    const r = await fsPut('pq_' + cls + '/' + a.uid, { name: olName(), cid: save.car, carName: curCar().name, car: pkBlob(), at: new Date(srvNow()) });
+    if (!r.ok) throw new Error('queue ' + r.status);
+    const t0 = Date.now();
+    const poll = async () => {
+      if (PK.st !== 'queue') return;
+      try {
+        const mine = (await fsQuery('pm', ['b', a.uid], null, 10)).filter(m => m.st === 'ready' && m.treeAt > srvNow() + 3000);
+        if (mine.length) { fsDel('pq_' + cls + '/' + a.uid); return pkGo(mine[0]._id); }
+        const q = (await fsQuery('pq_' + cls, null, 'at', 20)).filter(e => e._id !== a.uid && srvNow() - e.at < 45000);
+        const other = q[0];
+        if (other && a.uid < other._id) {
+          const id = a.uid + '_' + other._id;
+          const m = { a: a.uid, b: other._id, an: olName(), bn: cleanName(other.name) || 'Racer', ac: pkBlob(), bc: other.car, cls, st: 'ready', code: false, treeAt: new Date(srvNow() + 20000) };
+          const w = await fsPut('pm/' + id, m);
+          if (w.ok) { fsDel('pq_' + cls + '/' + a.uid); return pkGo(id); }
+        }
+      } catch (_) {}
+      if (Date.now() - t0 > 120000) return pkStop('Nobody in your class right now. Try again later, or race a friend with a code.');
+      PK.msg = 'Looking for a racer in your class… ' + Math.round((Date.now() - t0) / 1000) + ' s'; pkRender();
+      PK.timer = setTimeout(poll, 1500);
+    };
+    poll();
+  } catch (e) { pkStop('Could not reach the online server. Check your connection.'); }
+}
+async function pkHost() {
+  try {
+    const a = await olAuth(), L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; let code = '', ok = false;
+    for (let k = 0; k < 5 && !ok; k++) {
+      code = Array.from({ length: 4 }, () => L[Math.floor(Math.random() * L.length)]).join('');
+      const r = await fsPut('pm/' + code, { a: a.uid, b: '', an: olName(), bn: '', ac: pkBlob(), bc: '', cls: pkCls(), st: 'open', code: true, treeAt: new Date(srvNow() + 600000) }, 'currentDocument.exists=false');
+      ok = r.ok;
+    }
+    if (!ok) throw new Error('code');
+    PK.st = 'host'; PK.code = code; PK.msg = 'Send your friend this code. Waiting for them to join…'; pkRender();
+    const t0 = Date.now();
+    const poll = async () => {
+      if (PK.st !== 'host') return;
+      try {
+        const m = await fsGet('pm/' + code);
+        if (m && m.st === 'joined' && m.b) { const w = await fsSet('pm/' + code, { st: 'ready', treeAt: new Date(srvNow() + 20000) }); if (w.ok) { PK.code = ''; return pkGo(code); } }
+      } catch (_) {}
+      if (Date.now() - t0 > 600000) return pkStop('The code expired. Make a new one.');
+      PK.timer = setTimeout(poll, 1500);
+    };
+    poll();
+  } catch (e) { pkStop('Could not reach the online server. Check your connection.'); }
+}
+async function pkJoin(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+  if (code.length !== 4) { PK.msg = 'Codes are 4 letters.'; return pkRender(); }
+  try {
+    const a = await olAuth();
+    PK.st = 'join'; PK.msg = 'Joining ' + code + '…'; pkRender();
+    const m = await fsGet('pm/' + code);
+    if (!m || m.st !== 'open' || !m.a) return pkStop('No open race with code ' + code + '.');
+    if (m.a === a.uid) return pkStop('That is your own code.');
+    if (m.cls !== pkCls()) { const H = pkParse(m.ac); return pkStop('Their ' + (H ? H.name : 'car') + ' is in a different class. Pink slips need cars of the same class.'); }
+    const w = await fsSet('pm/' + code, { b: a.uid, bn: olName(), bc: pkBlob(), st: 'joined' });
+    if (!w.ok) return pkStop('Someone else joined first.');
+    PK.msg = 'Joined. Waiting for the host…'; pkRender();
+    const t0 = Date.now();
+    const poll = async () => {
+      if (PK.st !== 'join') return;
+      try { const m2 = await fsGet('pm/' + code); if (m2 && m2.st === 'ready' && m2.b === a.uid) return pkGo(code); } catch (_) {}
+      if (Date.now() - t0 > 60000) return pkStop('The host did not start the race.');
+      PK.timer = setTimeout(poll, 1200);
+    };
+    poll();
+  } catch (e) { pkStop('Could not reach the online server. Check your connection.'); }
+}
+
+/* ---- the race ---- */
+async function pkGo(id) {
+  clearTimeout(PK.timer);
+  const a = await olAuth(), m = await fsGet('pm/' + id);
+  if (!m || m.st !== 'ready') return pkStop('The match was cancelled.');
+  const me = m.a === a.uid ? 'a' : 'b', them = me === 'a' ? 'b' : 'a';
+  const mine = pkParse(m[me + 'c']), theirs = pkParse(m[them + 'c']);
+  if (!mine || !theirs || mine.cid !== save.car) return pkStop('The match could not start.');
+  const T = theirs, og = { name: cleanName(m[them + 'n']) || 'Racer', look: cleanLook(T.look), voice: typeof T.voice === 'string' && VOICE[T.voice] ? T.voice : 'v8', snd: T.snd && typeof T.snd === 'object' ? { cam: +T.snd.cam || 0, hdr: +T.snd.hdr || 0, exh: +T.snd.exh || 0 } : { cam: 0, hdr: 0, exh: 0 }, nos: !!T.nos, eng: String(T.eng || ''), lr: 4000, carName: T.name, tr: [], mk: {}, rt: null, done: false, fc: 0, foul: false, quit: false, seen: Date.now(), me: false };
+  LIVE = { id, me, oppUid: m[them], oppName: cleanName(m[them + 'n']) || 'Racer', theirs, cid: save.car, treeAt: m.treeAt, g: og, pushAt: 0, pullAt: 0, busy: false, final: false };
+  save.pinkEsc = { id, cid: save.car, oppUid: LIVE.oppUid, at: Date.now() }; persist();
+  PK.st = 'race'; PK.msg = '';
+  GHOST = null; startRaceNow();
+  callout('Pink slips', 'warn', 'vs ' + LIVE.oppName + ' · ' + theirs.name);
+}
+function liveRacer() {
+  const g = LIVE.g, o = new LiveRacer({ cond: COND, power: 1, mu: 1, auto: true, eng: ENGINES.find(e => e.id === g.eng) || ENGINES[0] }, g);
+  o.sv = g.voice; o.sndm = g.snd; o.nosAud = g.nos; o.rt = Infinity; o.target = g.lr || 4000; return o;
+}
+/* called every frame while a live race runs */
+function liveTick(h) {
+  if (!LIVE || LIVE.ending) return;
+  const now = srvNow();
+  if (phase === 'burnout' && now >= LIVE.treeAt - 3500) enterStage();
+  if (phase === 'burnout' || phase === 'stage') { const s = Math.ceil((LIVE.treeAt - now) / 1000); if (s !== LIVE.cd && s >= 0 && s <= 15) { LIVE.cd = s; setHint((phase === 'burnout' ? 'Burnout, then tap GO to roll in. ' : 'Hold GO to stage. ') + 'Tree drops in ' + s + ' s.'); } }
+  if (LIVE.g.rt !== null && opp.rt === Infinity) opp.rt = LIVE.g.rt;
+  opp.liveNow = phase === 'run' ? raceT : 0;
+  if (!LIVE.busy && Date.now() - LIVE.pullAt > 350) { LIVE.pullAt = Date.now(); livePull(); }
+  if (phase === 'run' && player.mode === 'run' && !LIVE.final && Date.now() - LIVE.pushAt > 500) { LIVE.pushAt = Date.now(); livePush(false); }
+}
+async function livePull() {
+  if (!LIVE) return; const L = LIVE; L.busy = true;
+  try {
+    const r = await fsGet('pm/' + L.id + '/r/' + L.oppUid);
+    if (r) {
+      const g = L.g; g.seen = Date.now();
+      if (typeof r.rt === 'number') g.rt = r.rt;
+      if (r.tr) { try { const t = JSON.parse(r.tr); if (Array.isArray(t) && t.length >= g.tr.length) g.tr = t; } catch (_) {} }
+      if (r.foul) g.foul = true; if (r.quit) g.quit = true;
+      if (r.done) { g.fc = +r.fc || 0; try { g.mk = JSON.parse(r.mk || '{}'); } catch (_) { g.mk = {}; } g.done = true; }
+    }
+  } catch (_) {}
+  L.busy = false;
+}
+function livePush(final, foulRun) {
+  if (!LIVE) return Promise.resolve();
+  const p = player, mk = {}; MARKS.forEach(m => { if (p.marks[m]) mk[m] = [+p.marks[m].t.toFixed(4), +p.marks[m].v.toFixed(2)]; });
+  const d = { rt: foulRun ? -1 : p.t0 || 0, tr: JSON.stringify(p.trace || []), done: !!final, foul: !!foulRun, quit: false, fc: p.finishClock || 0, mk: JSON.stringify(mk), at: new Date(srvNow()) };
+  return fsPut('pm/' + LIVE.id + '/r/' + OL.auth.uid, d).catch(() => {});
+}
+/* end of a live race: finish our run, send it, wait for theirs, then settle the pink slip */
+async function liveEnd(wasFoul) {
+  syncWear(); burnUI(false); phase = 'done'; setGas(false); setTimeout(sfxShutdown, 900); coachOff();
+  const L = LIVE; L.final = true; L.ending = true; ['btnAgain', 'btnGarage'].forEach(id => { const b = $(id); if (b) b.disabled = true; });
+  const dead = !wasFoul && !!player.blown;
+  if (!wasFoul && !dead) fastForward(player);
+  const myT = wasFoul || dead || !player.finished ? Infinity : player.t0 + player.finishClock;
+  await livePush(true, wasFoul || dead);
+  $('slip').innerHTML = '<div class="slip-h"><b>Pink slips · Live</b><span>vs ' + esc(L.oppName) + ' · ' + esc(L.theirs.name) + '</span></div><div class="slip-win">Waiting for ' + esc(L.oppName) + ' to cross the line…<small>Your time ' + (isFinite(myT) ? (myT - player.t0).toFixed(3) + ' s, R/T ' + player.t0.toFixed(3) : wasFoul ? 'red light' : 'no time') + '</small></div>';
+  $('pay').innerHTML = ''; $('btnReplay').hidden = true; $('slipSheet').hidden = false;
+  const t0 = Date.now();
+  while (!L.g.done && !L.g.quit) { await new Promise(r => setTimeout(r, 700)); await livePull(); if (Date.now() - L.g.seen > 20000 || Date.now() - t0 > 60000) { L.g.quit = true; break; } }
+  const g = L.g, oT = g.quit || g.foul || !g.done || !(g.fc > 0) ? Infinity : g.rt + g.fc;
+  let res = 'push';
+  if (isFinite(myT) || isFinite(oT)) res = myT < oT ? 'win' : oT < myT ? 'lose' : 'push';
+  const out = pkSettle(res, L);
+  save.pinkEsc = null; persist(); LIVE = null; PK.st = 'idle'; ['btnAgain', 'btnGarage'].forEach(id => { const b = $(id); if (b) b.disabled = false; });
+  $('cash').textContent = money(save.cash);
+  const yt = isFinite(myT) ? (myT - player.t0).toFixed(3) + ' s · R/T ' + player.t0.toFixed(3) : wasFoul ? 'Red light' : dead ? 'Engine failure' : 'No time';
+  const tt = g.quit ? 'Left the race' : g.foul ? 'Red light' : isFinite(oT) ? g.fc.toFixed(3) + ' s · R/T ' + g.rt.toFixed(3) : 'No time';
+  let html = '<div class="slip-h"><b>Pink slips · Live</b><span>vs ' + esc(L.oppName) + ' · ' + esc(L.theirs.name) + '</span></div>';
+  html += '<div class="sg head"><span></span><span>YOU</span><span>' + esc(L.oppName.toUpperCase()) + '</span></div><div class="sg big"><span>Result</span><span>' + esc(yt) + '</span><span>' + esc(tt) + '</span></div>';
+  html += '<div class="slip-win">' + (res === 'win' ? 'You won their ' + esc(L.theirs.name) : res === 'lose' ? 'You lost your ' + esc(out.lostName || 'car') : 'No winner') + '<small>' + (res === 'push' ? 'Nobody set a clean time, so both cars stay put.' : isFinite(myT) && isFinite(oT) ? 'by ' + Math.abs(myT - oT).toFixed(3) + ' s at the line' : g.quit && res === 'win' ? esc(L.oppName) + ' left the race. Quitting counts as a loss.' : '') + '</small></div>';
+  $('slip').innerHTML = html;
+  $('pay').innerHTML = res === 'win' ? (out.cash ? '<span>You already own one. TJ bought it <b>+' + money(out.cash) + '</b></span>' : '<span>New car <em>' + esc(L.theirs.name) + ' is in your garage, exactly as they built it</em></span>') : res === 'lose' ? '<span>Their garage <em>now has your ' + esc(out.lostName || 'car') + '</em></span>' : '';
+  try { resultFx({ win: res === 'win', foul: wasFoul, dead, margin: isFinite(myT) && isFinite(oT) ? Math.abs(myT - oT) : 0, prize: 0, rv: { name: L.oppName } }); } catch (_) {}
+}
+function pkSettle(res, L) {
+  if (res === 'win') {
+    const b = L.theirs, c = CARS.find(x => x.id === b.cid);
+    if (save.ownedCars.includes(b.cid) || garageFull()) { const cash = Math.round((c.price || 0) * 0.75 / 50) * 50; save.cash += cash; return { cash }; }
+    save.ownedCars.push(b.cid); (save.carAt = save.carAt || {})[b.cid] = Date.now();
+    const build = Object.assign(freshBuild(c), b.build || {}); if (!ENGINES.find(e => e.id === build.eng)) build.eng = c.eng;
+    save.cars[b.cid] = build; markFab(b.cid, build.eng); if (!save.owned.includes(build.eng)) save.owned.push(build.eng);
+    PK_COS.forEach(k => { if (b.cos && b.cos[k] !== undefined) { if (!save[k] || typeof save[k] !== 'object') save[k] = {}; save[k][b.cid] = b.cos[k]; } });
+    return { won: c.name };
+  }
+  if (res === 'lose') return { lostName: pkLoseCar(L.cid) };
+  return {};
+}
+function pkLoseCar(cid) {
+  const lc = CARS.find(x => x.id === cid); if (!save.ownedCars.includes(cid) || save.ownedCars.length < 2) return lc ? lc.name : 'car';
+  if (save.car === cid) save.cars[cid] = pickBuild();
+  save.ownedCars = save.ownedCars.filter(id => id !== cid); delete save.cars[cid];
+  if (save.car === cid) { const other = save.ownedCars[0], oc = CARS.find(x => x.id === other); Object.assign(save, { afr: 0.5, tim: 0.5 }, save.cars[other] || freshBuild(oc)); save.car = other; if (!save.owned.includes(save.eng)) save.owned.push(save.eng); }
+  return lc ? lc.name : 'car';
+}
+/* the game was closed during a pink slip race: that counts as a loss */
+function pkBoot() {
+  const e = save.pinkEsc; if (!e || LIVE) return;
+  save.pinkEsc = null; const name = pkLoseCar(e.cid); persist();
+  if (OL_ON()) olAuth().then(a => fsPut('pm/' + e.id + '/r/' + a.uid, { rt: -1, tr: '[]', done: true, foul: true, quit: true, fc: 0, mk: '{}', at: new Date(srvNow()) })).catch(() => {});
+  setTimeout(() => { try { callout('Pink slip forfeited', 'bad', 'You left the race. Your ' + name + ' is gone.'); } catch (_) {} }, 1200);
+}
+
+/* ---- Race > Pinks tab ---- */
+function pkRender() { if (gTab === 'pinks' && !$('garage').hidden) renderPinks(); }
+function renderPinks() {
+  const U = $('pinksList'); if (!U) return; U.textContent = '';
+  const c = curCar(), C = CLS_BY[(PD && PD.cls ? PD.cls.id : '')] || { name: '', col: '#fff' };
+  const card = mk('div', 'olcard pkcard');
+  card.appendChild(mk('div', 'olh', 'On the line'));
+  const cv = document.createElement('canvas'); cv.className = 'pkthumb'; card.appendChild(cv); try { drawCarThumb(cv, c, pickBuild()); } catch (_) {}
+  const nm = mk('div', 'gn', c.name); card.appendChild(nm);
+  const cl = mk('div', 'gc'); cl.appendChild(document.createTextNode('Class ')); const cb = mk('b', null, C.name); cb.style.color = C.col; cl.appendChild(cb); cl.appendChild(document.createTextNode(' · you only race cars in the same class')); card.appendChild(cl);
+  U.appendChild(card);
+  if (!OL_ON()) { U.appendChild(mk('div', 'olnote', 'Pink slips need online races, which are not switched on in this version.')); return; }
+  const checks = pkChecks(), ok = checks.every(x => x[1]);
+  const ul = mk('ul', 'pkchecks'); checks.forEach(([t, v]) => { const li = mk('li', v ? 'ok' : 'no'); li.appendChild(mk('span', 'i', v ? '✓' : '✕')); li.appendChild(document.createTextNode(t)); ul.appendChild(li); }); U.appendChild(ul);
+  if (PK.msg) U.appendChild(mk('div', 'olnote pkmsg', PK.msg));
+  if (PK.st === 'queue' || PK.st === 'join' || PK.st === 'host') {
+    if (PK.st === 'host' && PK.code) { const cd = mk('div', 'pkcode', PK.code); cd.setAttribute('aria-label', 'Race code ' + PK.code.split('').join(' ')); U.appendChild(cd); }
+    const x = mk('button', 'olbtn sm', 'Cancel'); x.type = 'button'; x.onclick = () => pkStop(''); U.appendChild(x); return;
+  }
+  if (!ok) { U.appendChild(mk('div', 'olnote', olName() ? 'Meet every rule above to race for pinks.' : 'Set a racer name in Race → Online first.')); return; }
+  const arm = (key, label, fn) => { const b = mk('button', 'olbtn pkbtn', PK.confirm === key ? 'Tap again: bet my ' + c.name : label); b.type = 'button'; b.onclick = () => { if (PK.confirm !== key) { PK.confirm = key; return renderPinks(); } PK.confirm = ''; PK.msg = ''; fn(); }; return b; };
+  const row = mk('div', 'pkrow'); row.appendChild(arm('q', 'Quick match', pkQuick)); row.appendChild(arm('h', 'Race a friend', pkHost)); U.appendChild(row);
+  const jr = mk('div', 'olrow'), inp = document.createElement('input'); inp.className = 'olin'; inp.maxLength = 4; inp.placeholder = 'Friend’s code'; inp.value = PK.joinIn; inp.setAttribute('aria-label', 'Friend’s race code'); inp.autocapitalize = 'characters'; inp.oninput = () => { PK.joinIn = inp.value.toUpperCase(); };
+  jr.appendChild(inp); jr.appendChild(arm('j', 'Join', () => pkJoin(inp.value))); U.appendChild(jr);
+  U.appendChild(mk('div', 'olnote', 'Live race against a real player. Winner takes the loser’s car, exactly as it’s built. Leaving mid-race counts as a loss.'));
+}
+
+setTimeout(() => { try { pkBoot(); } catch (_) {} }, 1500);
+
 function renderBlack(U) {
   const day = dayKey(); if (!save.bm || save.bm.d !== day) save.bm = { d: day, bought: [] };
   const bm = save.bm, bmD = challengesToday().all ? 0.8 : 1; let h = 11; for (let c = 0; c < day.length; c++) h = (h * 31 + day.charCodeAt(c)) >>> 0;
@@ -4964,7 +5280,7 @@ function renderBlack(U) {
     const cvs = document.createElement('canvas'); cvs.className = 'thumb'; row.appendChild(cvs); try { drawCarThumb(cvs, car, freshBuild(car)); } catch (_) {}
     row.appendChild(mk('div', 'lift'));
     const b = mk('button', 'buy', sold ? 'Sold' : garageFull() ? 'Garage full' : 'Take it · ' + money(price)); b.type = 'button'; b.disabled = sold || garageFull() || save.cash < price;
-    b.onclick = () => { if (save.cash < price || sold || garageFull()) return; save.cash -= price; bm.bought.push('car:' + car.id); save.ownedCars.push(car.id); save.cars[car.id] = freshBuild(car); markFab(car.id, car.eng); if (!save.owned.includes(car.eng)) save.owned.push(car.eng); switchCar(car.id); };
+    b.onclick = () => { if (save.cash < price || sold || garageFull()) return; save.cash -= price; bm.bought.push('car:' + car.id); save.ownedCars.push(car.id); (save.carAt = save.carAt || {})[car.id] = Date.now(); save.cars[car.id] = freshBuild(car); markFab(car.id, car.eng); if (!save.owned.includes(car.eng)) save.owned.push(car.eng); switchCar(car.id); };
     row.appendChild(b); row.appendChild(mk('div', 'us', car.drive + ' · ' + (car.req > beaten ? 'normally needs ' + (car.req - beaten) + ' more wins · ' : '') + 'premium ' + money(price))); IN.appendChild(row);
   }
   persist();
@@ -6139,7 +6455,7 @@ function drawHud(p, o) {
   const bx = pad, bw = W - pad - padr, by = 12;
   ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.fillRect(bx, by, bw, 3);
   const pp = Math.min(1, Math.max(0, p.x / QM)), op = Math.min(1, Math.max(0, o.x / QM));
-  ctx.fillStyle = GHOST ? GHOST.look.paint : RIVALS[save.rival].color; ctx.beginPath(); ctx.arc(bx + bw * op, by + 1.5, 5, 0, 7); ctx.fill();
+  ctx.fillStyle = GHOST ? GHOST.look.paint : LIVE ? LIVE.g.look.paint : RIVALS[save.rival].color; ctx.beginPath(); ctx.arc(bx + bw * op, by + 1.5, 5, 0, 7); ctx.fill();
   ctx.fillStyle = save.paint; ctx.beginPath(); ctx.arc(bx + bw * pp, by + 1.5, 5, 0, 7); ctx.fill();
   ctx.strokeStyle = '#ffc21a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(bx + bw * pp, by + 1.5, 5, 0, 7); ctx.stroke();
 
@@ -6488,7 +6804,7 @@ function showStarter() {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'buy'; b.textContent = 'Choose';
     b.setAttribute('aria-label', 'Choose ' + c.name + ' as your starter car');
     b.onclick = () => {
-      if (!save.ownedCars.includes(c.id)) save.ownedCars.push(c.id);
+      if (!save.ownedCars.includes(c.id)) save.ownedCars.push(c.id); (save.carAt = save.carAt || {})[c.id] = Date.now();
       save.cars[c.id] = freshBuild(c); markFab(c.id, c.eng);
       if (!save.owned.includes(c.eng)) save.owned.push(c.eng);
       needStarter = false; $('starter').hidden = true;
