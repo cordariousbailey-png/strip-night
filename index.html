@@ -4236,15 +4236,16 @@ const ebCount = id => Object.keys(save.eb[id] || {}).length;
 const rebuildCost = e => Math.round((300 + e.price * 0.25) / 50) * 50;
 /* ---- engine swap fitment: size of the engine against the engine bay, the drivetrain layout, and the fabrication bill ---- */
 const ECLS = {};
-['b16b', 'b18c', 'k20a', 'k24a2', 'sr20', '4g63', '4g64'].forEach(i => { ECLS[i] = ['I4', 1]; }); ECLS.ej257 = ['H4', 1];
-['2jz', '1jz', 'rb26', 'b58'].forEach(i => { ECLS[i] = ['I6', 2]; }); ['turbo', 'vr38'].forEach(i => { ECLS[i] = ['V6', 2]; });
+['b16b', 'b18c', 'k20a', 'k20c', 'k24a2', 'sr20', '4g63', '4g64'].forEach(i => { ECLS[i] = ['I4', 1]; }); ECLS.ej257 = ['H4', 1];
+['2jz', '1jz', 'rb26', 'b58'].forEach(i => { ECLS[i] = ['I6', 2]; }); ['turbo', 'vr38', 'vq35'].forEach(i => { ECLS[i] = ['V6', 2]; });
 ['rotary', '13brew'].forEach(i => { ECLS[i] = ['ROT', 1]; }); ECLS['20b'] = ['ROT', 2]; ECLS['26b'] = ['ROT', 3];
-['v8', 'c305', 'c327', 'c383', 'c400', 'ls53', 'ls60', 'ls1', 'ls2', 'ls62', 'ls3', 'ls7', 'f302', 'f351', 'coyote', 'm340', 'm360'].forEach(i => { ECLS[i] = ['V8', 3]; });
+['v8', 'c305', 'c327', 'c383', 'c400', 'ls53', 'ls60', 'ls1', 'ls2', 'ls62', 'ls3', 'ls7', 'f302', 'f351', 'coyote', 'mod46', 's65', 'm340', 'm360'].forEach(i => { ECLS[i] = ['V8', 3]; });
 ['bb', 'h392', 'sc', 'hell', 'demon', 'ttv8'].forEach(i => { ECLS[i] = ['V8B', 4]; });
 const eclsOf = e => ECLS[e.id] || ['V8', 3];
 /* each car: drivetrain layout and the biggest engine size that can physically be made to fit */
 const CAR_FIT = { ek9: ['fwd', 1], dc2: ['fwd', 1], s15: ['rwd', 3], fd: ['rwd', 3], evo: ['awd', 2], sti: ['awd', 2], supra: ['rwd', 3], r34: ['awd', 3],
-  fox: ['rwd', 3], iroc: ['rwd', 3], s10: ['rwd', 3], chevelle: ['rwd', 4], z28: ['rwd', 3], camss: ['rwd', 3], gt: ['rwd', 4], hellcat: ['rwd', 4] };
+  fox: ['rwd', 3], iroc: ['rwd', 3], s10: ['rwd', 3], chevelle: ['rwd', 4], z28: ['rwd', 3], camss: ['rwd', 3], gt: ['rwd', 4], hellcat: ['rwd', 4],
+  fk8: ['fwd', 1], e92: ['rwd', 3], g35: ['rwd', 3], r35: ['awd', 3], cvic: ['rwd', 4] };
 const FIT_LV = ['Original engine', 'Bolt-in swap', 'Fabrication needed', 'Heavy fabrication', 'Extreme fabrication'];
 function fitOf(e, car) {
   const nat = ENGINES.find(x => x.id === car.eng) || ENGINES[0], ne = eclsOf(nat), ee = eclsOf(e), cf = CAR_FIT[car.id] || ['rwd', 4];
