@@ -3114,7 +3114,7 @@ function audioTick() {
   if (!AC || !engP || !engO || AU.lab) return;
   if (DYNO.on && DYNO.sp && !save.mute) {
     const e = DYNO.sp.eng, b = e.bst;
-    engP.set(DYNO.rpm, DYNO.load, true, e.voice || e.id, { boost: DYNO.bo, psi: DYNO.psi || 0, pk: b ? b.pk : 0, bst: b, cut: DYNO.rpm > e.red * 0.985 && Math.floor(performance.now() / 65) % 2 ? 0.25 : 1, fx: e.fx, snd: e.snd, nos: 0, turbo: e.turbo, red: e.red, dmg: 0, al: false, wgExt: !!(b && b.cfg !== 'sc') });
+    engP.set(DYNO.rpm, DYNO.load, true, e.voice || e.id, { boost: DYNO.bo, psi: DYNO.psi || 0, pk: b ? b.pk : 0, bst: b, cut: DYNO.rpm > (DYNO.top || e.red) * 0.985 && Math.floor(performance.now() / 65) % 2 ? 0.25 : 1, fx: e.fx, snd: e.snd, nos: 0, turbo: e.turbo, red: e.red, dmg: 0, al: false, wgExt: !!(b && b.cfg !== 'sc') });
     engO.set(0, 0, false, 'v8', {}); return;
   }
   const t = AC.currentTime, live = phase !== 'garage' && phase !== 'done' && !document.hidden;
@@ -5446,8 +5446,19 @@ function renderGearing(S) {
 }
 const DYNO = { on: false, rpm: 0, t0: 0, ghost: null, raf: 0, sp: null, pts: null };
 function dynoPts(sp) {
-  const pts = [];
-  for (let r = 1000; r <= sp.eng.red; r += 100) { const t = torque(sp.eng.tqB || sp.eng.tq, r) * sp.power * sp.eng.k; pts.push({ r, t, h: t * r / 9549 * 1.341 }); }
+  const pts = [], red = sp.eng.red, tqAt = r => torque(sp.eng.tqB || sp.eng.tq, r) * sp.power * sp.eng.k;
+  for (let r = 1000; r <= red; r += 100) { const t = tqAt(r); pts.push({ r, t, h: t * r / 9549 * 1.341 }); }
+  /* if power is still climbing at redline, keep pulling past the limiter until the engine actually peaks and rolls over:
+     torque carries on along its own trend (never rising), and valve float pulls it down harder the further past redline */
+  let pk = pts.reduce((a, b) => b.h > a.h ? b : a);
+  if (pk.r >= red - 200) {
+    const tR = tqAt(red), slope = Math.min(0, (tR - tqAt(red - 500)) / 500);
+    for (let r = red + 100; r <= red + 2500; r += 100) {
+      const o = r - red, t = Math.max(0, tR + slope * o) * Math.max(0.3, 1 - 0.35 * (o / 700) ** 2), h = t * r / 9549 * 1.341;
+      pts.push({ r, t, h, over: true }); if (h > pk.h) pk = pts[pts.length - 1];
+      if (r >= pk.r + 300 && h < pk.h * 0.95) break;
+    }
+  }
   return pts;
 }
 function dynoBoost(sp, rpm) { const b = sp.eng.bst; if (!b) return sp.eng.turbo ? clamp01((rpm - 2200) / 1800) : 0; return clamp01((rpm - (b.type === 'sc' ? 1000 : 2200)) / (b.type === 'sc' ? 2200 : 1900)); }
@@ -5456,10 +5467,12 @@ function renderDynoTab(cur) {
   const sp = DYNO.on && DYNO.sp ? DYNO.sp : buildSpec(), pts = DYNO.on && DYNO.pts ? DYNO.pts : dynoPts(sp);
   const pt = pts.reduce((a, b) => b.t > a.t ? b : a), ph = pts.reduce((a, b) => b.h > a.h ? b : a);
   const gh = DYNO.ghost && DYNO.ghost.car === save.car ? DYNO.ghost.pts : null;
-  $('dyPeak').innerHTML = 'Peak power <b>' + Math.round(ph.h) + ' hp</b> at ' + ph.r.toLocaleString('en-US') + ' rpm<br>Peak torque <b>' + Math.round(pt.t) + ' Nm</b> at ' + pt.r.toLocaleString('en-US') + ' rpm' + (gh ? (() => { const g2 = gh.reduce((a, b) => b.h > a.h ? b : a), d = Math.round(ph.h - g2.h); return '<br>Vs last pull <b>' + (d > 0 ? '+' : '') + d + ' hp</b>'; })() : '');
+  /* past-redline peak only counts if it is a real gain over what the car races with */
+  const inRed = pts.filter(p => p.r <= sp.eng.red).reduce((a, b) => b.h > a.h ? b : a), usable = ph.r > sp.eng.red && ph.h - inRed.h >= Math.max(3, inRed.h * 0.01) ? inRed : null, pk = ph.r > sp.eng.red && !usable ? inRed : ph;
+  $('dyPeak').innerHTML = 'Peak power <b>' + Math.round(pk.h) + ' hp</b> at ' + pk.r.toLocaleString('en-US') + ' rpm' + (usable ? ', past your ' + sp.eng.red.toLocaleString('en-US') + ' redline. You race with <b>' + Math.round(usable.h) + ' hp</b>: raise the redline with valvetrain parts to use the rest' : '') + '<br>Peak torque <b>' + Math.round(pt.t) + ' Nm</b> at ' + pt.r.toLocaleString('en-US') + ' rpm' + (gh ? (() => { const g2 = gh.reduce((a, b) => b.h > a.h ? b : a), d = Math.round(ph.h - g2.h); return '<br>Vs last pull <b>' + (d > 0 ? '+' : '') + d + ' hp</b>'; })() : '');
   const b0 = sp.eng.bst || sp.eng.turbo; $('dyBstL').textContent = sp.eng.bst ? (sp.eng.bst.type === 'sc' ? 'Blower' : 'Boost') + ' psi' : 'Boost';
   if (cur == null) { $('dyRpm').textContent = '0'; $('dyNm').textContent = '0'; $('dyHp').textContent = '0'; $('dyBst').innerHTML = '&ndash;'; }
-  drawDyno(sp, pts, sp.eng.ideal, pt, ph, { id: 'dyBig', cur: cur, ghost: gh });
+  drawDyno(sp, pts, sp.eng.ideal, pt, pk, { id: 'dyBig', cur: cur, ghost: gh });
   try { dysKick(); } catch (e) {}
 }
 /* ---- dyno cell: the player's car strapped to the rollers in a pixel tuning shop; the wall monitor draws the pull ---- */
@@ -5548,7 +5561,7 @@ function dynoRun() {
   try { audioStart(); } catch (e) {}
   const sp = buildSpec(); DYNO.sp = sp; DYNO.pts = dynoPts(sp); DYNO.on = true; DYNO.t0 = performance.now(); DYNO.rpm = 1000; DYNO.load = 1; DYNO.bo = 0; DYNO.psi = 0;
   $('dyRun').textContent = 'Stop';
-  const red = sp.eng.red, dur = 4.5 + red / 4000;
+  const red = DYNO.pts[DYNO.pts.length - 1].r, dur = 4.5 + red / 4000; DYNO.top = red;
   const step = () => {
     if (!DYNO.on) return;
     const k = (performance.now() - DYNO.t0) / 1000 / dur, hold = k > 1 ? Math.min(1, (k - 1) / 0.12) : 0;
@@ -5597,7 +5610,7 @@ function drawDyno(sp, pts, ideal, pt, ph, o) {
   c.width = Math.floor(box.width * d); c.height = Math.floor(box.height * d);
   const g = c.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0);
   const w = box.width, h = box.height, e = sp.eng;
-  const x0 = 34, x1 = w - 10, y0 = 14, y1 = h - 22, rmin = 1000, rmax = e.red + 300;
+  const x0 = 34, x1 = w - 10, y0 = 14, y1 = h - 22, rmin = 1000, rmax = Math.max(e.red + 300, pts[pts.length - 1].r + 100);
   const ymax = Math.ceil(Math.max.apply(null, pts.concat(o.ghost || []).map(p => Math.max(p.t, p.h))) * 1.12 / 100) * 100;
   const X = r => x0 + (r - rmin) / (rmax - rmin) * (x1 - x0), Y = v => y1 - v / ymax * (y1 - y0);
   g.fillStyle = '#0b1020'; g.fillRect(0, 0, w, h);
@@ -7883,7 +7896,7 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v261 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v262 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
   if (!needStarter) { $('tBackup').hidden = false; $('tGear').hidden = false; $('tHelp').hidden = false; }
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
