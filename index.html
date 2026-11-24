@@ -576,7 +576,16 @@ body { background: var(--night); }
 .cstrip button { flex: 0 0 104px; display: grid; justify-items: center; padding: 4px 4px 5px; border: 1px solid rgba(255,255,255,.12); border-radius: 8px; background: rgba(10,8,28,.8); color: #aebdf0; font: 700 10px var(--f-body); }
 .cstrip button.on { border-color: #ff3b5c; box-shadow: 0 0 12px rgba(255,59,92,.55); color: #fff; }
 .cstrip canvas { width: 100%; height: 38px; } .cstrip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.how { margin: 14px 0 4px; } .how summary { cursor: pointer; font: 800 13px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: #ffd24a; padding: 8px 0; }
+.how { margin: 14px 0 4px; } .how h4 { margin: 16px 0 6px; font: 800 12px var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: #35d6ff; }
+.how .hl { margin: 0 0 6px; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+.how .hl li { margin: 3px 0; } .how .hl b, .how .faq b { color: var(--paper); }
+.how .faq { margin: 6px 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.how .faq summary { font: 700 14px var(--f-body); letter-spacing: 0; text-transform: none; color: var(--paper); padding: 6px 0; }
+.how .faq p { margin: 2px 0 8px; }
+#howSec .steps { grid-template-columns: 1fr; }
+#howSec .hl, #howSec .hl li, #howSec .faq p { font: 400 14px/1.45 var(--f-body); font-style: normal; text-transform: none; letter-spacing: 0; }
+#howSec .hl b, #howSec .faq p b { font-weight: 700; }
+.how summary { cursor: pointer; font: 800 13px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: #ffd24a; padding: 8px 0; }
 .gstage .prev { border-color: rgba(255,59,92,.45); box-shadow: 0 0 20px rgba(255,59,92,.15); }
 @media (orientation: landscape) and (max-height: 600px) {
   #garage .sheet { width: 100%; max-width: none; display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); column-gap: 18px; row-gap: 0; align-content: start; padding-block: 6px 10px; }
@@ -1094,6 +1103,7 @@ body.burning .dock .inner { grid-template-columns: 1.15fr .85fr 1.15fr; }
         <button type="button" class="main" id="tPlay">Play</button>
         <button type="button" id="tMusic">Music: on</button>
         <button type="button" id="tBackup" hidden>Backup and restore</button>
+        <button type="button" id="tHelp" hidden>How to play</button>
       </div>
     </div>
     <div class="tver" id="tVer">MIDNIGHT GRUDGE</div>
@@ -1145,13 +1155,52 @@ body.burning .dock .inner { grid-template-columns: 1.15fr .85fr 1.15fr; }
       <div class="hact" id="hAct"></div>
     </section>
     </details>
-    <details class="how" data-gt="career"><summary>How to play</summary>
+    <details class="how" id="howSec" data-gt="career"><summary>How to play</summary>
 <p class="lede">Quarter-mile drag racing. 1,320 feet, two lanes, one green light. Beat each rival, spend the prize money in the garage, and chase a faster time slip.</p>
     <ol class="steps">
       <li><span><b>Hold Go and Gas.</b> Go holds the car on the line. Rev to the ideal marker, then tap Gas to keep the needle on it.</span></li>
       <li><span><b>Release Go</b> the instant the green light comes on. Let go early and it is a red light. Keep Gas down off the line and ease off if the grip bar goes red.</span></li>
       <li><span><b>Tap Shift</b> (same button) when the lights hit red. N2O gives one two-second push. SCRAMBLE skips the nitrous ramp and hits the full shot at once. It is a short, hard hit: about 80% of the shot for 1.3 seconds, with an 8% risk of a blown piston, and it breaks the tires loose for a moment.</span></li>
     </ol>
+    <h4>Burnout</h4>
+    <ul class="hl">
+      <li>A burnout heats the tires for more grip. Hold <b>Burnout</b>, then hold <b>Gas</b>, or tap <b>Go</b> to skip it.</li>
+      <li>Stop when the tires read <b>READY</b>. Too hot and the grip fades, street tires most of all.</li>
+      <li>Front, rear and all-wheel drive cars burn out differently. The coach walks you through each one the first time.</li>
+    </ul>
+    <h4>The garage</h4>
+    <ul class="hl">
+      <li><b>Performance shop:</b> buy parts and adjust the tune. Every change shows up in your PR number and the dyno chart.</li>
+      <li><b>Engines:</b> buy any engine and swap it into the car you are driving. Build it part by part in the Builder tab.</li>
+      <li><b>Dyno:</b> make a pull to see your power and torque before you race.</li>
+      <li><b>Dealership and My garage:</b> each car keeps its own parts, tune and paint. Beat more rivals to unlock better cars.</li>
+    </ul>
+    <h4>Engine wear</h4>
+    <ul class="hl">
+      <li>Every run adds a little wear. Risky builds and aggressive tunes wear the engine faster.</li>
+      <li>Push too hard and the engine can blow. A blown engine needs a rebuild before it races again.</li>
+      <li>After a race you can watch an ad for a free service or rebuild.</li>
+    </ul>
+    <h4>Rivals and stars</h4>
+    <ul class="hl">
+      <li>Beat a rival to unlock the next one. The first win pays the full prize, and rematches pay less.</li>
+      <li>Each rival has three stars: win, win by 0.10 s or more, and win with a launch grade of A or better. New stars pay a bonus.</li>
+      <li>Rivals tune up after you beat them, and they adjust to your build, so keep upgrading.</li>
+    </ul>
+    <h4>Events and online</h4>
+    <ul class="hl">
+      <li><b>Daily rival:</b> one rival you have beaten, the same all day. The first win of the day pays triple, and a streak builds when you come back the next day.</li>
+      <li><b>Online:</b> race the ghosts of real players, their actual runs replayed in lane 2.</li>
+      <li><b>Pink slips:</b> race a real player live. The winner takes the loser's car.</li>
+    </ul>
+    <h4>Questions</h4>
+    <details class="faq"><summary>How do I save my progress?</summary><p>Your career is saved on this phone automatically. To keep it safe if you clear the app or get a new phone, use <b>Backup and restore</b> on the main menu or above in this tab.</p></details>
+    <details class="faq"><summary>Can I shift automatically?</summary><p>Yes. Open <b>Settings</b> and set Shifting to <b>Auto</b>.</p></details>
+    <details class="faq"><summary>I keep getting a red light.</summary><p>You let go of Go before the green. Keep Go held through the yellow lights and release it the moment the green comes on.</p></details>
+    <details class="faq"><summary>My car spins the tires off the line.</summary><p>Do a burnout to READY, launch at the ideal rpm marker, and ease off Gas when the grip bar turns red. Better tires and suspension from the shop help too.</p></details>
+    <details class="faq"><summary>Do I have to pay to win?</summary><p>No. Purchases are never needed to win. Cash packs only save grinding, and Remove ads in the Store turns off the pop-up ads.</p></details>
+    <details class="faq"><summary>How do I watch the story again?</summary><p>Open <b>Settings</b> and tap <b>Replay</b> next to Seen scenes.</p></details>
+    <details class="faq"><summary>Something is not working.</summary><p>Tap <b>Email us</b> in Settings, or write to midnightgrudge75@gmail.com. Tell us your phone model and what happened.</p></details>
     </details>
     <details class="fold" data-gt="race" id="clsSec"><summary>Class and rules</summary><div id="clsCard"></div></details>
     <section class="sec" data-gt="race"><h2>Pick your rival</h2><div class="rivals" id="rivalList"></div></section>
@@ -1236,6 +1285,12 @@ body.burning .dock .inner { grid-template-columns: 1.15fr .85fr 1.15fr; }
       <div class="setrow"><span>Volume</span><input type="range" id="vol" min="0" max="100" step="5" aria-label="Volume"></div>
       <div class="setrow"><span>Car sound</span><input type="range" id="volCar" min="0" max="150" step="5" aria-label="Car sound volume"></div>
       <div class="setrow"><span>Music volume</span><input type="range" id="volMus" min="0" max="100" step="5" aria-label="Music volume"></div>
+      <div class="setrow"><span>Help</span>
+        <div class="seg"><button type="button" id="hlpOpen">How to play</button></div></div>
+      <div class="setrow"><span>Enjoying Strip Night?</span>
+        <div class="seg"><button type="button" id="rateBtn">Rate it</button></div></div>
+      <div class="setrow"><span>Support</span>
+        <div class="seg"><button type="button" id="supBtn">Email us</button></div></div>
       </div></details>
     <button class="cta alt" id="btnLab" type="button" data-gt="career">Audio test lab</button>
     <button class="cta alt" id="btnReset" type="button" data-gt="career">Restart career</button>
@@ -3279,6 +3334,7 @@ function renderAdRow(o) {
   if (o.gate) { const b = mk('button', null, 'Unlock the full game (' + MONET.price('full') + ')'); b.type = 'button'; b.onclick = () => { $('slipSheet').hidden = true; showGarage(); gTab = 'store'; applyGTab(); renderGarage(); }; R.appendChild(b); }
   if (o.prize > 0) add('Watch an ad: double the prize (+' + money(o.prize) + ')', b => { save.cash += o.prize; persist(); $('cash').textContent = money(save.cash); b.textContent = 'Prize doubled'; b.disabled = true; sfxCoin(); });
   if (!o.dead && (save.wear[o.eng] || 0) > 0.3) add('Watch an ad: free engine service (' + Math.round(save.wear[o.eng] * 100) + '% wear)', b => { delete save.wear[o.eng]; persist(); b.textContent = 'Engine serviced'; b.disabled = true; sfxCoin(); });
+  if (o.rate) { const b = mk('button', null, 'Enjoying Strip Night? Rate it on Google Play'); b.type = 'button'; b.onclick = () => { rateApp(); b.textContent = 'Thanks for rating!'; b.disabled = true; }; R.appendChild(b); }
   if (o.dead) add('Watch an ad: free engine rebuild', b => { delete save.dmg[o.eng]; delete save.wear[o.eng]; persist(); b.textContent = 'Engine rebuilt'; b.disabled = true; sfxCoin(); });
 }
 function maybeInterstitial() {
@@ -3956,7 +4012,7 @@ function endRace(wasFoul) {
   }
   $('pay').innerHTML = pay;
   if (!wasFoul) save.adRaces = (save.adRaces || 0) + 1;
-  renderAdRow({ prize: wasFoul ? 0 : prize, dead: !wasFoul && !!player.blown, eng: save.eng, gate: gateNote });
+  renderAdRow({ prize: wasFoul ? 0 : prize, dead: !wasFoul && !!player.blown, eng: save.eng, gate: gateNote, rate: !wasFoul && firstWin && !save.seen.rated && Object.keys(save.wins).filter(k => save.wins[k]).length >= 2 });
   $('btnReplay').hidden = wasFoul || rec.length < 8;
   $('slipSheet').hidden = false; $('slipSheet').scrollTop = 0;
   try { olAfterRace(wasFoul); } catch (_) {}
@@ -5590,6 +5646,27 @@ function openSettings() {
     const d = document.querySelector('details.setbox'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); }
   } catch (e) {}
 }
+/* help, rating and support (tester feedback, v260) */
+const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.midnightgrudge.stripnight';
+const SUPPORT_MAIL = 'midnightgrudge75@gmail.com';
+/* in the Android app, leaving the page is caught by Capacitor and handed to the Play Store, mail or browser app; on the web open a new tab */
+function openExt(url) {
+  try { if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) { location.href = url; return; } } catch (e) {}
+  if (/^mailto:/.test(url)) { location.href = url; return; }
+  try { if (window.open(url, '_blank', 'noopener')) return; } catch (e) {}
+  location.href = url;
+}
+function rateApp() { save.seen.rated = 1; persist(); openExt(PLAY_URL); }
+function openHelp() {
+  try {
+    if ($('garage').hidden) showGarage();
+    gTab = 'career'; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0);
+    const d = $('howSec'); if (d) { d.open = true; d.scrollIntoView({ block: 'start' }); }
+  } catch (e) {}
+}
+$('hlpOpen').onclick = openHelp;
+$('rateBtn').onclick = rateApp;
+$('supBtn').onclick = () => { let v = ''; try { v = $('tVer').textContent.split(' ')[0]; } catch (e) {} openExt('mailto:' + SUPPORT_MAIL + '?subject=' + encodeURIComponent('Strip Night support' + (v ? ' (' + v + ')' : ''))); };
 $('btnSettings').onclick = () => { audioStart(); openSettings(); };
 $('gGear').onclick = () => { openSettings(); };
 $('trMan').onclick = () => { save.auto = false; persist(); renderGarage(); };
@@ -7727,14 +7804,15 @@ function titleInit(go) {
   size(); window.addEventListener('resize', size); raf = requestAnimationFrame(draw);
   try { if (!needStarter) { const car = curCar(), cc = $('tCar'); cc.hidden = false; cc.dataset.nobg = '1'; const dr = () => drawCarThumb(cc, car, car.id === save.car ? pickBuild() : (save.cars[car.id] || pickBuild())); dr(); IMG_HOOK.title = () => { if (!done) dr(); }; } } catch (e) {}
   T.addEventListener('pointerdown', () => { try { audioStart(); } catch (e) {} }, { once: true });
-  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v259 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
+  const ver = $('tVer'), vt = setInterval(() => { if (done) { clearInterval(vt); return; } ver.textContent = 'v260 \u00b7 music: ' + (MUS.file ? (MUS.file.paused ? 'theme ready' : 'theme playing') : (MUS.bus ? 'synth' : 'tap to start')); }, 500);
   const play = $('tPlay'); play.textContent = needStarter ? 'New game' : 'Continue';
-  if (!needStarter) { $('tBackup').hidden = false; $('tGear').hidden = false; }
+  if (!needStarter) { $('tBackup').hidden = false; $('tGear').hidden = false; $('tHelp').hidden = false; }
   const mus = $('tMusic'), msync = () => { mus.textContent = 'Music: ' + (save.music !== false ? 'on' : 'off'); };
   mus.onclick = () => { save.music = save.music === false; persist(); msync(); if (save.music !== false) audioStart(); const a = $('muOn'), b = $('muOff'); if (a && b) { a.setAttribute('aria-pressed', save.music !== false ? 'true' : 'false'); b.setAttribute('aria-pressed', save.music === false ? 'true' : 'false'); } }; msync();
   function leave(after) { if (done) return; done = true; delete IMG_HOOK.title; cancelAnimationFrame(raf); window.removeEventListener('resize', size); T.classList.add('out'); setTimeout(() => { T.hidden = true; if (after) after(); }, 480); }
   play.onclick = () => { audioStart(); leave(go); };
   $('tGear').onclick = () => { audioStart(); leave(openSettings); };
+  $('tHelp').onclick = () => { audioStart(); leave(openHelp); };
   $('tBackup').onclick = () => { audioStart(); leave(() => { try { gTab = 'career'; applyGTab(); renderGarage(); $('garage').scrollTo(0, 0); const b = $('backupSec'); if (b) b.scrollIntoView(); } catch (e) {} }); };
   setTimeout(() => T.classList.add('ready'), 1500);
 }
